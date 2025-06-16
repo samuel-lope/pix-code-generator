@@ -24,7 +24,7 @@ const qrCodeGenerator = (() => {
         const PAD0 = 0xEC;
         const PAD1 = 0x11;
         let _typeNumber = typeNumber || 1;
-        let _errorCorrectLevel = errorCorrectLevel || 'L';
+        let _errorCorrectLevel = errorCorrectLevel || 'Q';
         let _modules = null;
         let _moduleCount = 0;
         let _dataCache = null;
