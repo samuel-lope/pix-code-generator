@@ -3,24 +3,21 @@
  *
  * Este worker expõe um endpoint que aceita requisições POST com dados em JSON
  * para gerar uma string de payload PIX estático e a imagem do QR Code correspondente.
+ * Se a geração do QR Code falhar, a resposta ainda incluirá o "pixCopiaECola".
  *
  * Endpoint: /pix/code/generator
  * Método: POST
  *
- * Exemplo de Body (JSON):
+ * Exemplo de Resposta em caso de sucesso:
  * {
- * "pixKey": "a9f8b412-3e2c-4b6d-8a6e-4f5a6b1c2d3e",
- * "merchantName": "Nome do Comerciante",
- * "merchantCity": "SAO PAULO",
- * "amount": "10.50",
- * "txid": "TXIDUNICO123",
- * "description": "Pagamento do pedido 123"
+ * "pixCopiaECola": "00020126...",
+ * "qrCodeBase64": "data:image/svg+xml;base64,PHN2ZyB..."
  * }
  *
- * Exemplo de Resposta (JSON):
+ * Exemplo de Resposta em caso de falha no QR Code:
  * {
- * "pixCopiaECola": "00020126580014br.gov.b...",
- * "qrCodeBase64": "data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zP..."
+ * "pixCopiaECola": "00020126...",
+ * "qrCodeBase64": null
  * }
  */
 
@@ -409,14 +406,15 @@ const qrCodeGenerator = new(function() {
   this.generateSvgBase64 = function(text) {
     try {
       var qr = new qrcode();
-      qr.addData(text);
+      qr.addData(text, 'Byte'); // Explicitly set encoding to 'Byte'
       qr.make();
-      var svgString = qr.createSvgTag(4, 8);
+      var svgString = qr.createSvgTag(4, 8); // cell size 4, margin 8
       var svgBase64 = btoa(svgString);
       return `data:image/svg+xml;base64,${svgBase64}`;
     } catch (e) {
-      console.error("Erro ao gerar QR Code:", e);
-      throw new Error("Falha na geração do QR Code SVG.");
+      console.error("Erro ao gerar QR Code SVG:", e);
+      // Retorna null em caso de erro, ao invés de lançar uma exceção que para a execução.
+      return null;
     }
   };
 });
@@ -455,12 +453,12 @@ async function handleRequest(request) {
 
       const pixPayload = generatePixPayload(data);
 
-      // Geração do QR Code usando o módulo encapsulado
+      // Geração do QR Code. A função agora retorna null em caso de falha.
       const qrCodeBase64 = qrCodeGenerator.generateSvgBase64(pixPayload);
 
       return new Response(JSON.stringify({
         pixCopiaECola: pixPayload,
-        qrCodeBase64: qrCodeBase64
+        qrCodeBase64: qrCodeBase64 // Será o SVG em base64 ou null
       }), {
         status: 200,
         headers: {
@@ -479,7 +477,8 @@ async function handleRequest(request) {
           },
         });
       }
-      console.error('Erro inesperado:', error);
+      // Captura erros da geração do payload do PIX ou outros erros inesperados.
+      console.error('Erro inesperado no handleRequest:', error);
       return new Response(JSON.stringify({
         error: `Ocorreu um erro interno: ${error.message}`
       }), {
@@ -548,9 +547,10 @@ function generatePixPayload(data) {
     throw new Error("O txid deve conter apenas letras e números e ter no máximo 25 caracteres.");
   }
   if (description) {
+    // Validação simplificada do tamanho da descrição. A regra real depende do tamanho da chave.
     const maxDescLength = 99 - 4 - 14 - (4 + pixKey.length) - 4;
     if (description.length > maxDescLength) {
-       throw new Error(`A descrição é muito longa para a chave fornecida. Máximo de ${maxDescLength} caracteres.`);
+      throw new Error(`A descrição é muito longa para a chave PIX fornecida. Máximo de ${maxDescLength} caracteres.`);
     }
   }
 
