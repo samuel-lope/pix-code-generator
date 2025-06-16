@@ -509,3 +509,14 @@ function generatePixPayload(data) {
     const merchantAccountInfo = formatField('26', `${gui}${key}${desc}`);
     const merchantCategoryCode = formatField('52', '0000');
     const transactionCurrency = formatField('53', '986');
+    const formattedAmount = amount ? formatField('54', parseFloat(amount).toFixed(2)) : '';
+    const countryCode = formatField('58', 'BR');
+    const merchantNameFormatted = formatField('59', merchantName);
+    const merchantCityFormatted = formatField('60', merchantCity);
+    const additionalDataField = formatField('62', formatField('05', txid));
+    let payload = `${formatField('00','01')}${merchantAccountInfo}${merchantCategoryCode}${transactionCurrency}${formattedAmount}${countryCode}${merchantNameFormatted}${merchantCityFormatted}${additionalDataField}`;
+    const payloadWithCrcId = `${payload}6304`;
+    const crc = calculateCRC16(payloadWithCrcId);
+    return `${payload}6304${crc}`;
+}
+
