@@ -1,0 +1,18 @@
+// Primeira versão alpha
+
+{
+  "name": "pix-code-generator",
+  "compatibility_date": "2025-04-16",
+  "main": "src/worker.js",
+  "routes": [
+    {
+      "pattern": "pix.api.sl.app.br",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  }
+}
