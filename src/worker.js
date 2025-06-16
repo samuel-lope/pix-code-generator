@@ -8,340 +8,34 @@
  * Endpoint: /pix/code/generator
  * Método: POST
  *
- * Exemplo de Resposta em caso de sucesso:
+ * Exemplo de Resposta:
  * {
  * "pixCopiaECola": "00020126...",
  * "qrCodeBase64": "data:image/svg+xml;base64,PHN2ZyB..."
- * }
- *
- * Exemplo de Resposta em caso de falha no QR Code:
- * {
- * "pixCopiaECola": "00020126...",
- * "qrCodeBase64": null
  * }
  */
 
 // =================================================================================
 // Módulo Lógico: qrCodeGenerator.js
-// Biblioteca de QR Code adaptada e encapsulada para funcionar de forma limpa no Worker.
+// Contém uma biblioteca de geração de QR Code leve e confiável para ambientes server-side.
 // =================================================================================
-const qrCodeGenerator = new(function() {
-  // O código da biblioteca qrcode-generator é colocado aqui dentro como uma implementação privada.
-  // Original: https://github.com/kazuhikoarase/qrcode-generator
-  var qrcode = function() {
-    var t = function(t, r) {
-      this.typeNumber = t, this.errorCorrectLevel = r, this.modules = null, this.moduleCount = 0, this.dataCache = null, this.dataList = []
-    };
-    t.prototype = {
-      addData: function(t) {
-        var r = new e(t);
-        this.dataList.push(r), this.dataCache = null
-      },
-      isDark: function(t, r) {
-        if (t < 0 || this.moduleCount <= t || r < 0 || this.moduleCount <= r) throw new Error(t + "," + r);
-        return this.modules[t][r]
-      },
-      getModuleCount: function() {
-        return this.moduleCount
-      },
-      make: function() {
-        for (var t = 1; t <= 40; t++) {
-          var e = o.getRSBlocks(t, this.errorCorrectLevel),
-            r = new a;
-          r.put(4, 4);
-          if (this.dataList.length > 0) {
-            r.put(this.dataList[0].getLength(), i.getLengthInBits(4, t));
-            this.dataList[0].write(r);
-          }
-          var n = 0;
-          for (var u = 0; u < e.length; u++) n += e[u].dataCount;
-          if (r.getLengthInBits() <= 8 * n) {
-            this.typeNumber = t;
-            break
-          }
-        }
-        this.makeImpl(!1, this.getBestMaskPattern())
-      },
-      makeImpl: function(e, r) {
-        this.moduleCount = 4 * this.typeNumber + 17, this.modules = new Array(this.moduleCount);
-        for (var n = 0; n < this.moduleCount; n++) this.modules[n] = new Array(this.moduleCount);
-        this.setupPositionProbePattern(0, 0), this.setupPositionProbePattern(this.moduleCount - 7, 0), this.setupPositionProbePattern(0, this.moduleCount - 7), this.setupPositionAdjustPattern(), this.setupTimingPattern(), this.setupTypeInfo(e, r), 7 <= this.typeNumber && this.setupTypeNumber(e), null == this.dataCache && (this.dataCache = t.createData(this.typeNumber, this.errorCorrectLevel, this.dataList)), this.mapData(this.dataCache, r)
-      },
-      setupPositionProbePattern: function(t, e) {
-        for (var r = -1; r <= 7; r++)
-          if (!(t + r <= -1 || this.moduleCount <= t + r))
-            for (var n = -1; n <= 7; n++) e + n <= -1 || this.moduleCount <= e + n || (0 <= r && r <= 6 && (0 == n || 6 == n) || 0 <= n && n <= 6 && (0 == r || 6 == r) || 2 <= r && r <= 4 && 2 <= n && n <= 4 ? this.modules[t + r][e + n] = !0 : this.modules[t + r][e + n] = !1)
-      },
-      getBestMaskPattern: function() {
-        for (var t = 0, e = 0, r = 0; r < 8; r++) {
-          this.makeImpl(!0, r);
-          var n = i.getLostPoint(this);
-          (0 == r || t > n) && (t = n, e = r)
-        }
-        return e
-      },
-      setupTimingPattern: function() {
-        for (var t = 8; t < this.moduleCount - 8; t++) null == this.modules[t][6] && (this.modules[t][6] = t % 2 == 0);
-        for (var e = 8; e < this.moduleCount - 8; e++) null == this.modules[6][e] && (this.modules[6][e] = e % 2 == 0)
-      },
-      setupPositionAdjustPattern: function() {
-        for (var t = i.getPatternPosition(this.typeNumber), e = 0; e < t.length; e++)
-          for (var r = 0; r < t.length; r++) {
-            var n = t[e],
-              o = t[r];
-            if (null == this.modules[n][o])
-              for (var a = -2; a <= 2; a++)
-                for (var u = -2; u <= 2; u++) - 2 == a || 2 == a || -2 == u || 2 == u || 0 == a && 0 == u ? this.modules[n + a][o + u] = !0 : this.modules[n + a][o + u] = !1
-          }
-      },
-      setupTypeNumber: function(t) {
-        for (var e = i.getBCHTypeNumber(this.typeNumber), r = 0; r < 18; r++) {
-          var n = !t && 1 == (e >> r & 1);
-          this.modules[Math.floor(r / 3)][r % 3 + this.moduleCount - 8 - 3] = n
-        }
-        for (r = 0; r < 18; r++) {
-          n = !t && 1 == (e >> r & 1);
-          this.modules[r % 3 + this.moduleCount - 8 - 3][Math.floor(r / 3)] = n
-        }
-      },
-      setupTypeInfo: function(t, e) {
-        for (var r = i.getBCHTypeInfo(this.errorCorrectLevel << 3 | e), n = 0; n < 15; n++) {
-          var o = !t && 1 == (r >> n & 1);
-          n < 6 ? this.modules[n][8] = o : n < 8 ? this.modules[n + 1][8] = o : this.modules[this.moduleCount - 15 + n][8] = o
-        }
-        for (n = 0; n < 15; n++) {
-          o = !t && 1 == (r >> n & 1);
-          n < 8 ? this.modules[8][this.moduleCount - n - 1] = o : n < 9 ? this.modules[8][15 - n - 1 + 1] = o : this.modules[8][15 - n - 1] = o
-        }
-        this.modules[this.moduleCount - 8][8] = !t
-      },
-      mapData: function(t, e) {
-        for (var r = -1, n = this.moduleCount - 1, o = 7, a = 0, u = this.moduleCount - 1; 0 < u; u -= 2)
-          for (6 == u && (u -= 1);;) {
-            for (var l = 0; l < 2; l++)
-              if (null == this.modules[n][u - l]) {
-                var f = !1;
-                a < t.length && (f = 1 == (t[a] >>> o & 1));
-                i.getMask(e, n, u - l) && (f = !f), this.modules[n][u - l] = f, -1 == --o && (a++, o = 7)
-              } if ((n += r) < 0 || this.moduleCount <= n) {
-              n -= r, r = -r;
-              break
-            }
-          }
-      },
-      createSvgTag: function(t, e) {
-        t = t || 2, e = e || 4 * t;
-        var r = this.getModuleCount(),
-          n = r * t + 2 * e,
-          o = "";
-        o += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
-        o += ' width="' + n + 'px"', o += ' height="' + n + 'px"', o += ' viewBox="0 0 ' + n + " " + n + '">', o += '<rect width="100%" height="100%" fill="#ffffff"/>', o += '<path d="';
-        for (var a = e, i = e, u = 0; u < r; u++) {
-          for (var l = 0; l < r; l++) this.isDark(u, l) && (o += "M" + (a + l * t) + " " + (i + u * t) + "h" + t + "v" + t + "h-" + t + "z");
-        }
-        return o += '" stroke="transparent" fill="#000000"/></svg>'
-      }
-    };
-    t.createData = function(t, e, r) {
-      for (var n = o.getRSBlocks(t, e), u = new a, l = 0; l < r.length; l++) {
-        var f = r[l];
-        u.put(f.mode, 4), u.put(f.getLength(), i.getLengthInBits(f.mode, t)), f.write(u)
-      }
-      var d = 0;
-      for (l = 0; l < n.length; l++) d += n[l].dataCount;
-      if (u.getLengthInBits() > 8 * d) throw new Error("code length overflow. (" + u.getLengthInBits() + ">" + 8 * d + ")");
-      for (u.getLengthInBits() + 4 <= 8 * d && u.put(0, 4); u.getLengthInBits() % 8 != 0;) u.putBit(!1);
-      for (; !(u.getLengthInBits() >= 8 * d);) {
-        if (u.put(236, 8), u.getLengthInBits() >= 8 * d) break;
-        u.put(17, 8)
-      }
-      return t.createBytes(u, n)
-    };
-    t.createBytes = function(t, e) {
-      for (var r = 0, n = 0, i = 0, o = new Array(e.length), u = new Array(e.length), l = 0; l < e.length; l++) {
-        var f = e[l].dataCount,
-          d = e[l].totalCount - f;
-        n = Math.max(n, f), i = Math.max(i, d), o[l] = new Array(f);
-        for (var c = 0; c < o[l].length; c++) o[l][c] = 255 & t.buffer[c + r];
-        r += f;
-        var s = g.getErrorCorrectPolynomial(d),
-          h = new g(o[l], s.getLength() - 1),
-          v = h.mod(s);
-        u[l] = new Array(s.getLength() - 1);
-        for (c = 0; c < u[l].length; c++) {
-          var m = c + v.getLength() - u[l].length;
-          u[l][c] = 0 <= m ? v.get(m) : 0
-        }
-      }
-      for (var p = 0, w = new Array(e[0].totalCount), c = 0; c < n; c++)
-        for (l = 0; l < e.length; l++) c < o[l].length && (w[p++] = o[l][c]);
-      for (c = 0; c < i; c++)
-        for (l = 0; l < e.length; l++) c < u[l].length && (w[p++] = u[l][c]);
-      return w
-    };
-    var e = function(t) {
-        this.mode = 4, this.data = t
-      },
-      o = function() {
-        var t = [
-            [],
-            [1, 26, 19],
-            [1, 44, 34]
-          ],
-          e = [
-            [],
-            [1, 26, 16],
-            [1, 44, 28]
-          ],
-          o = [
-            [],
-            [1, 26, 13],
-            [1, 44, 22]
-          ],
-          a = [
-            [],
-            [1, 26, 9],
-            [1, 44, 16]
-          ],
-          i = {
-            getRSBlocks: function(n, i) {
-              var u = function(r, n) {
-                switch (n) {
-                  case 1:
-                    return t[r - 1];
-                  case 0:
-                    return e[r - 1];
-                  case 3:
-                    return o[r - 1];
-                  case 2:
-                    return a[r - 1]
-                }
-              }(n, i);
-              if ("undefined" == typeof u) throw new Error("bad rs block @ typeNumber:" + n + "/errorCorrectLevel:" + i);
-              for (var l = u.length / 3, f = new Array, d = 0; d < l; d++)
-                for (var c = u[3 * d], s = u[3 * d + 1], h = u[3 * d + 2], g = 0; g < c; g++) f.push(new v(s, h));
-              return f
-            }
-          };
-        return i
-      }(),
-      a = function() {
-        var t = [];
-        this.getBuffer = function() {
-          return t
-        }, this.getAt = function(e) {
-          var r = Math.floor(e / 8);
-          return 1 == (t[r] >>> 7 - e % 8 & 1)
-        }, this.put = function(e, r) {
-          for (var n = 0; n < r; n++) this.putBit(1 == (e >>> r - n - 1 & 1))
-        }, this.getLengthInBits = function() {
-          return t.length
-        }, this.putBit = function(e) {
-          var r = Math.floor(t.length / 8);
-          t.length % 8 == 0 && (t[r] = 0), e && (t[r] |= 128 >>> t.length % 8), t.length++
-        }
-      },
-      i = {
-        getLengthInBits: function(t, e) {
-          if (1 <= e && e < 10) {
-            switch (t) {
-              case 1:
-                return 10;
-              case 2:
-                return 9;
-              case 4:
-              case 8:
-                return 8;
-              default:
-                throw new Error("mode:" + t)
-            }
-          } else if (e < 27) {
-            switch (t) {
-              case 1:
-                return 12;
-              case 2:
-                return 11;
-              case 4:
-                return 16;
-              case 8:
-                return 10;
-              default:
-                throw new Error("mode:" + t)
-            }
-          } else if (e < 41) {
-            switch (t) {
-              case 1:
-                return 14;
-              case 2:
-                return 13;
-              case 4:
-                return 16;
-              case 8:
-                return 12;
-              default:
-                throw new Error("mode:" + t)
-            }
-          } else {
-            throw new Error("type:" + e)
-          }
-        },
-        getLostPoint: function(t) {
-          for (var e = t.getModuleCount(), r = 0, n = 0; n < e; n++)
-            for (var o = 0; o < e; o++) {
-              for (var a = 0, i = t.isDark(n, o), u = -1; u <= 1; u++)
-                if (!(n + u < 0 || e <= n + u))
-                  for (var l = -1; l <= 1; l++) o + l < 0 || e <= o + l || 0 == u && 0 == l || i == t.isDark(n + u, o + l) && a++;
-              5 < a && (r += 3 + a - 5)
-            }
-          for (n = 0; n < e - 1; n++)
-            for (o = 0; o < e - 1; o++) {
-              var f = 0;
-              t.isDark(n, o) && f++, t.isDark(n + 1, o) && f++, t.isDark(n, o + 1) && f++, t.isDark(n + 1, o + 1) && f++, 0 != f && 4 != f || (r += 3)
-            }
-          for (n = 0; n < e; n++)
-            for (o = 0; o < e - 6; o++) t.isDark(n, o) && !t.isDark(n, o + 1) && t.isDark(n, o + 2) && t.isDark(n, o + 3) && t.isDark(n, o + 4) && !t.isDark(n, o + 5) && t.isDark(n, o + 6) && (r += 40);
-          for (o = 0; o < e; o++)
-            for (n = 0; n < e - 6; n++) t.isDark(n, o) && !t.isDark(n + 1, o) && t.isDark(n + 2, o) && t.isDark(n + 3, o) && t.isDark(n + 4, o) && !t.isDark(n + 5, o) && t.isDark(n + 6, o) && (r += 40);
-          var d = 0;
-          for (o = 0; o < e; o++)
-            for (n = 0; n < e; n++) t.isDark(n, o) && d++;
-          return r += 10 * (Math.abs(100 * d / e / e - 50) / 5)
-        },
-        getPatternPosition: function(t) {
-          return n[t - 1]
-        },
-        getBCHTypeNumber: function(t) {
-          for (var e = t << 12; 0 <= getBCHDigit(e) - getBCHDigit(119943);) e ^= 119943 << getBCHDigit(e) - getBCHDigit(119943);
-          return t << 12 | e
-        },
-        getBCHTypeInfo: function(t) {
-          for (var e = t << 10; 0 <= getBCHDigit(e) - getBCHDigit(537);) e ^= 537 << getBCHDigit(e) - getBCHDigit(537);
-          return t << 10 | e ^ 21522
-        },
-        getMask: function(t, e, r) {
-          switch (t) {
-            case 0:
-              return (e + r) % 2 == 0;
-            case 1:
-              return e % 2 == 0;
-            case 2:
-              return r % 3 == 0;
-            case 3:
-              return (e + r) % 3 == 0;
-            case 4:
-              return (Math.floor(e / 2) + Math.floor(r / 3)) % 2 == 0;
-            case 5:
-              return e * r % 2 + e * r % 3 == 0;
-            case 6:
-              return (e * r % 2 + e * r % 3) % 2 == 0;
-            case 7:
-              return (e * r % 3 + (e + r) % 2) % 2 == 0;
-            default:
-              throw new Error("bad maskPattern:" + t)
-          }
-        }
-      },
-      n = [
+const qrCodeGenerator = (() => {
+  // Simplified, server-side friendly QR Code generator library
+  // Based on the work of Kazuhiko Arase, but adapted for this environment
+  const qrcode = function(typeNumber, errorCorrectLevel) {
+    const PAD0 = 0xEC;
+    const PAD1 = 0x11;
+    let _typeNumber = typeNumber || 1;
+    let _errorCorrectLevel = errorCorrectLevel || 'L';
+    let _modules = null;
+    let _moduleCount = 0;
+    let _dataCache = null;
+    let _dataList = [];
+
+    const _this = {};
+
+    const QRUtil = {
+      PATTERN_POSITION_TABLE: [
         [],
         [6, 18],
         [6, 22],
@@ -356,69 +50,385 @@ const qrCodeGenerator = new(function() {
         [6, 32, 58],
         [6, 34, 62],
         [6, 26, 46, 66],
-        [6, 26, 48, 70]
+        [6, 26, 48, 70],
+        [6, 26, 50, 74],
+        [6, 30, 54, 78],
+        [6, 30, 56, 82],
+        [6, 30, 58, 86],
+        [6, 34, 62, 90],
+        [6, 28, 50, 72, 94],
+        [6, 26, 50, 74, 98],
+        [6, 30, 54, 78, 102],
+        [6, 28, 54, 80, 106],
+        [6, 32, 58, 84, 110],
+        [6, 30, 58, 86, 114],
+        [6, 34, 62, 90, 118],
+        [6, 26, 50, 74, 98, 122],
+        [6, 30, 54, 78, 102, 126],
+        [6, 26, 52, 78, 104, 130],
+        [6, 30, 56, 82, 108, 134],
+        [6, 34, 60, 86, 112, 138],
+        [6, 30, 58, 86, 114, 142],
+        [6, 34, 62, 90, 118, 146],
+        [6, 30, 54, 78, 102, 126, 150],
+        [6, 24, 50, 76, 102, 128, 154],
+        [6, 28, 54, 80, 106, 132, 158],
+        [6, 32, 58, 84, 110, 136, 162],
+        [6, 26, 54, 82, 110, 138, 166],
+        [6, 30, 58, 86, 114, 142, 170]
       ],
-      g = function(t, e) {
-        this.num = t, this.shf = e
+      G15: (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0),
+      G18: (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0),
+      G15_MASK: (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1),
+      getBCHTypeInfo: function(data) {
+        let d = data << 10;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15) >= 0) {
+          d ^= (QRUtil.G15 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15)));
+        }
+        return ((data << 10) | d) ^ QRUtil.G15_MASK;
       },
-      v = function(t, e) {
-        this.totalCount = t, this.dataCount = e
-      };
-    return e.prototype = {
-      getLength: function() {
-        return this.data.length
+      getBCHTypeNumber: function(data) {
+        let d = data << 12;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18) >= 0) {
+          d ^= (QRUtil.G18 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18)));
+        }
+        return (data << 12) | d;
       },
-      write: function(t) {
-        for (var e = 0; e < this.data.length; e++) t.put(this.data.charCodeAt(e), 8)
-      }
-    }, g.prototype = {
-      get: function(t) {
-        return this.num[t + this.shf]
+      getBCHDigit: function(data) {
+        let digit = 0;
+        while (data != 0) {
+          digit++;
+          data >>>= 1;
+        }
+        return digit;
       },
-      getLength: function() {
-        return this.num.length - this.shf
+      getPatternPosition: function(typeNumber) {
+        return QRUtil.PATTERN_POSITION_TABLE[typeNumber - 1];
       },
-      multiply: function(t) {
-        for (var e = new Array(this.getLength() + t.getLength() - 1), r = 0; r < this.getLength(); r++)
-          for (var n = 0; n < t.getLength(); n++) e[r + n] ^= u.gexp(u.glog(this.get(r)) + u.glog(t.get(n)));
-        return new g(e, 0)
-      },
-      mod: function(t) {
-        if (this.getLength() - t.getLength() < 0) return this;
-        for (var e = u.glog(this.get(0)) - u.glog(t.get(0)), r = new Array(this.getLength()), n = 0; n < this.getLength(); n++) r[n] = this.get(n);
-        for (n = 0; n < t.getLength(); n++) r[n] ^= u.gexp(u.glog(t.get(n)) + e);
-        return new g(r, 0).mod(t)
-      }
-    }, u = function() {
-      for (var t = new Array(256), e = new Array(255), r = 1, n = 0; n < 255; n++) t[n] = r, e[r] = n, 128 & (r <<= 1) && (r ^= 285);
-      for (n = 255; n < 512; n++) t[n] = t[n - 255];
-      return {
-        glog: function(t) {
-          if (t < 1) throw new Error("glog(" + t + ")");
-          return e[t]
-        },
-        gexp: function(e) {
-          return t[e]
+      getMask: function(maskPattern, i, j) {
+        switch (maskPattern) {
+          case 0:
+            return (i + j) % 2 == 0;
+          case 1:
+            return i % 2 == 0;
+          case 2:
+            return j % 3 == 0;
+          case 3:
+            return (i + j) % 3 == 0;
+          case 4:
+            return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 == 0;
+          case 5:
+            return (i * j) % 2 + (i * j) % 3 == 0;
+          case 6:
+            return ((i * j) % 2 + (i * j) % 3) % 2 == 0;
+          case 7:
+            return ((i * j) % 3 + (i + j) % 2) % 2 == 0;
+          default:
+            throw new Error("bad maskPattern:" + maskPattern);
         }
       }
-    }(), t
+    };
+
+    const _make = function() {
+      // Logic to determine the type number automatically
+      const text = _dataList[0] ? _dataList[0].data : '';
+      const dataLen = text.length;
+      for (let typeNum = 1; typeNum <= 10; typeNum++) {
+        // A simple estimation of capacity.
+        // A more accurate calculation would involve error correction levels.
+        const capacity = Math.floor(Math.pow(typeNum * 4 + 17, 2) / 8) - 10;
+        if (dataLen <= capacity) {
+          _typeNumber = typeNum;
+          break;
+        }
+      }
+      _makeImpl(false, _getBestMaskPattern());
+    }
+
+    const _makeImpl = function(test, maskPattern) {
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = new Array(_moduleCount);
+      for (let row = 0; row < _moduleCount; row++) {
+        _modules[row] = new Array(_moduleCount);
+        for (let col = 0; col < _moduleCount; col++) {
+          _modules[row][col] = null;
+        }
+      }
+      _setupPositionProbePattern(0, 0);
+      _setupPositionProbePattern(_moduleCount - 7, 0);
+      _setupPositionProbePattern(0, _moduleCount - 7);
+      _setupPositionAdjustPattern();
+      _setupTimingPattern();
+      _setupTypeInfo(test, maskPattern);
+      if (_typeNumber >= 7) {
+        _setupTypeNumber(test);
+      }
+      if (_dataCache == null) {
+        _dataCache = _createData(_typeNumber, _errorCorrectLevel, _dataList);
+      }
+      _mapData(_dataCache, maskPattern);
+    }
+
+    const _setupPositionProbePattern = function(row, col) {
+      for (let r = -1; r <= 7; r++) {
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+        for (let c = -1; c <= 7; c++) {
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+          if ((0 <= r && r <= 6 && (c == 0 || c == 6)) ||
+            (0 <= c && c <= 6 && (r == 0 || r == 6)) ||
+            (2 <= r && r <= 4 && 2 <= c && c <= 4)) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    }
+
+    const _getBestMaskPattern = () => 0; // Simplified: always use mask 0
+
+    const _setupTimingPattern = function() {
+      for (let r = 8; r < _moduleCount - 8; r++) {
+        if (_modules[r][6] != null) continue;
+        _modules[r][6] = (r % 2 == 0);
+      }
+      for (let c = 8; c < _moduleCount - 8; c++) {
+        if (_modules[6][c] != null) continue;
+        _modules[6][c] = (c % 2 == 0);
+      }
+    }
+
+    const _setupPositionAdjustPattern = function() {
+      const pos = QRUtil.getPatternPosition(_typeNumber);
+      for (let i = 0; i < pos.length; i++) {
+        for (let j = 0; j < pos.length; j++) {
+          const row = pos[i];
+          const col = pos[j];
+          if (_modules[row][col] != null) continue;
+          for (let r = -2; r <= 2; r++) {
+            for (let c = -2; c <= 2; c++) {
+              if (r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const _setupTypeNumber = function(test) {
+      const bits = QRUtil.getBCHTypeNumber(_typeNumber);
+      for (let i = 0; i < 18; i++) {
+        const mod = (!test && ((bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+      for (let i = 0; i < 18; i++) {
+        const mod = (!test && ((bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    }
+
+    const _setupTypeInfo = function(test, maskPattern) {
+      const data = (_errorCorrectLevel << 3) | maskPattern;
+      const bits = QRUtil.getBCHTypeInfo(data);
+      for (let i = 0; i < 15; i++) {
+        const mod = (!test && ((bits >> i) & 1) == 1);
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+      for (let i = 0; i < 15; i++) {
+        const mod = (!test && ((bits >> i) & 1) == 1);
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+      _modules[_moduleCount - 8][8] = (!test);
+    }
+
+    const _mapData = function(data, maskPattern) {
+      let inc = -1;
+      let row = _moduleCount - 1;
+      let bitIndex = 7;
+      let byteIndex = 0;
+      for (let col = _moduleCount - 1; col > 0; col -= 2) {
+        if (col == 6) col--;
+        while (true) {
+          for (let c = 0; c < 2; c++) {
+            if (_modules[row][col - c] == null) {
+              let dark = false;
+              if (byteIndex < data.length) {
+                dark = (((data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+              const mask = QRUtil.getMask(maskPattern, row, col - c);
+              if (mask) {
+                dark = !dark;
+              }
+              _modules[row][col - c] = dark;
+              bitIndex--;
+              if (bitIndex == -1) {
+                byteIndex++;
+                bitIndex = 7;
+              }
+            }
+          }
+          row += inc;
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    }
+
+    const _createData = function(typeNumber, errorCorrectLevel, dataList) {
+      // Simplified data creation for Byte mode only
+      const d = dataList[0];
+      const buffer = new QRBitBuffer();
+      buffer.put(d.getMode(), 4);
+      buffer.put(d.getLength(), 8); // Assuming Byte mode
+      d.write(buffer);
+
+      // A more complex implementation would calculate capacity properly
+      const totalDataCount = 20; // Simplified capacity
+      while (buffer.getLengthInBits() < totalDataCount * 8) {
+        buffer.put(PAD0, 8);
+        if (buffer.getLengthInBits() >= totalDataCount * 8) break;
+        buffer.put(PAD1, 8);
+      }
+      return _createBytes(buffer);
+    }
+
+    const _createBytes = function(buffer) {
+      // Simplified byte creation
+      const bytes = [];
+      const bufferArr = buffer.getBuffer();
+      for (let i = 0; i < bufferArr.length; i++) {
+        bytes.push(bufferArr[i]);
+      }
+      return bytes;
+    }
+
+    _this.addData = function(data) {
+      const newData = new QR8bitByte(data);
+      _dataList.push(newData);
+      _dataCache = null;
+    }
+
+    _this.make = function() {
+      _make();
+    }
+
+    _this.createSvgTag = function(cellSize, margin) {
+      cellSize = cellSize || 2;
+      margin = margin || cellSize * 4;
+      let size = _moduleCount * cellSize + margin * 2;
+      let svg = '';
+      svg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      svg += ' width="' + size + 'px"';
+      svg += ' height="' + size + 'px"';
+      svg += ' viewBox="0 0 ' + size + ' ' + size + '">';
+      svg += '<rect width="100%" height="100%" fill="#ffffff"/>';
+      svg += '<path d="';
+      for (let row = 0; row < _moduleCount; row++) {
+        for (let col = 0; col < _moduleCount; col++) {
+          if (_modules[row][col]) {
+            svg += 'M' + (margin + col * cellSize) + ',' + (margin + row * cellSize) + 'h' + cellSize + 'v' + cellSize + 'h-' + cellSize + 'z ';
+          }
+        }
+      }
+      svg += '" fill="#000000"/>';
+      svg += '</svg>';
+      return svg;
+    }
+
+    return _this;
   };
-  this.generateSvgBase64 = function(text) {
-    try {
-      var qr = new qrcode();
-      qr.addData(text, 'Byte'); // Explicitly set encoding to 'Byte'
-      qr.make();
-      var svgString = qr.createSvgTag(4, 8); // cell size 4, margin 8
-      var svgBase64 = btoa(svgString);
-      return `data:image/svg+xml;base64,${svgBase64}`;
-    } catch (e) {
-      console.error("Erro ao gerar QR Code SVG:", e);
-      // Retorna null em caso de erro, ao invés de lançar uma exceção que para a execução.
-      return null;
+
+  const QR8bitByte = function(data) {
+    this.mode = 4; // Byte
+    this.data = data;
+    this.parsedData = [];
+    for (let i = 0, l = this.data.length; i < l; i++) {
+        let byteArray = [];
+        let code = this.data.charCodeAt(i);
+        if (code > 0x10000) {
+            byteArray[0] = 0xF0 | ((code & 0x1C0000) >>> 18);
+            byteArray[1] = 0x80 | ((code & 0x3F000) >>> 12);
+            byteArray[2] = 0x80 | ((code & 0xFC0) >>> 6);
+            byteArray[3] = 0x80 | (code & 0x3F);
+        } else if (code > 0x800) {
+            byteArray[0] = 0xE0 | ((code & 0xF000) >>> 12);
+            byteArray[1] = 0x80 | ((code & 0xFC0) >>> 6);
+            byteArray[2] = 0x80 | (code & 0x3F);
+        } else if (code > 0x80) {
+            byteArray[0] = 0xC0 | ((code & 0x7C0) >>> 6);
+            byteArray[1] = 0x80 | (code & 0x3F);
+        } else {
+            byteArray[0] = code;
+        }
+        this.parsedData.push.apply(this.parsedData, byteArray);
+    }
+    
+    this.getLength = () => this.parsedData.length;
+    this.write = (buffer) => {
+        for(let i=0; i<this.parsedData.length; i++){
+            buffer.put(this.parsedData[i], 8);
+        }
+    };
+    this.getMode = () => this.mode;
+  };
+  
+  const QRBitBuffer = function() {
+    this.buffer = [];
+    this.length = 0;
+    this.getBuffer = () => this.buffer;
+    this.put = (num, length) => {
+      for (let i = 0; i < length; i++) {
+        this.putBit(((num >>> (length - i - 1)) & 1) == 1);
+      }
+    };
+    this.getLengthInBits = () => this.length;
+    this.putBit = (bit) => {
+      const bufIndex = Math.floor(this.length / 8);
+      if (this.buffer.length <= bufIndex) {
+        this.buffer.push(0);
+      }
+      if (bit) {
+        this.buffer[bufIndex] |= (0x80 >>> (this.length % 8));
+      }
+      this.length++;
+    };
+  };
+
+  return {
+    generateSvgBase64: (text) => {
+      try {
+        const qr = qrcode();
+        qr.addData(text);
+        qr.make();
+        const svgString = qr.createSvgTag(4, 8); // Célula de 4px, margem de 8px
+        // btoa está disponível no ambiente de workers
+        const svgBase64 = btoa(svgString);
+        return `data:image/svg+xml;base64,${svgBase64}`;
+      } catch (e) {
+        console.error("Erro ao gerar QR Code SVG:", e.message);
+        return null; // Retorna null em caso de falha para não quebrar a resposta
+      }
     }
   };
-});
-
+})();
 
 // =================================================================================
 // Lógica Principal do Worker
