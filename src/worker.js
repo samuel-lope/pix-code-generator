@@ -30,7 +30,7 @@
  * "description": "Pedido 123"
  * }'
  */
-
+// primeiro teste 16-06-2025
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request));
 });
