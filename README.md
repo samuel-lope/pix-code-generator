@@ -15,8 +15,8 @@ Exemplo de payload JSON enviado:
 }
 ```
 Exemplo cURL:
-```cURL
-curl --location 'api.sl.app.br/pix/code/generator' \
+```
+curl --location 'https://api.sl.app.br/pix/code/generator' \
 --header 'Content-Type: application/json' \
 --data-raw '{
   "pixKey": "pix.efi@sa.arq.br",
