@@ -1,147 +1,20 @@
 /**
- * Cloudflare Worker para gerar um payload de PIX Copia e Cola (BR Code) e um QR Code em SVG Base64.
+ * Cloudflare Worker para gerar um payload de PIX Copia e Cola (BR Code).
  *
- * Esta versão definitiva utiliza a arquitetura de Módulos ES e uma classe QRCode robusta
- * para garantir a correta geração do SVG em ambientes Cloudflare Workers.
+ * Esta versão foca apenas na geração da string "Copia e Cola",
+ * removendo a lógica de geração de QR Code para estabilidade.
  *
  * Endpoint: /pix/code/generator
  * Método: POST
  */
 
-// =================================================================================
-// Módulo de Geração de QR Code (qrcode.js)
-// Implementação robusta e autocontida, inspirada em qrcode-svg.
-// =================================================================================
-class QRCode {
-  constructor(options) {
-    if (typeof options === "string") {
-      options = { content: options };
-    }
-    this.options = {
-      padding: 4,
-      width: 256,
-      height: 256,
-      color: "#000000",
-      background: "#ffffff",
-      ecl: "Q", // Nível de correção 'Q' é ideal para PIX
-      ...options
-    };
-    this.qrcode = null;
-    if (this.options.content) {
-      this.makeCode(this.options.content);
-    }
-  }
-
-  makeCode(content) {
-    const errorCorrectionLevel = { L: 1, M: 0, Q: 3, H: 2 }[this.options.ecl];
-    const qr = new QRCodeModel(undefined, errorCorrectionLevel);
-    qr.addData(content);
-    qr.make();
-    this.qrcode = qr;
-  }
-
-  svg() {
-    if (!this.qrcode) return "";
-    const modules = this.qrcode.getModules();
-    const moduleCount = modules.length;
-    const { width, height, padding, color, background } = this.options;
-    const size = Math.min(width, height);
-    const cell_size = (size - 2 * padding) / moduleCount;
-    let path = "";
-
-    for (let r = 0; r < moduleCount; r++) {
-      for (let c = 0; c < moduleCount; c++) {
-        if (modules[r][c]) {
-          path += `M${padding + c * cell_size},${padding + r * cell_size}h${cell_size}v${cell_size}h-${cell_size}z `;
-        }
-      }
-    }
-
-    return `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="${width}px" height="${height}px" viewBox="0 0 ${width} ${height}">
-      <rect width="100%" height="100%" fill="${background}"/>
-      <path fill="${color}" d="${path}"/>
-    </svg>`;
-  }
-}
-
-// Internal QRCodeModel logic (abbreviated for clarity, but functional)
-function QRCodeModel(typeNumber, errorCorrectionLevel) {
-  this.typeNumber = typeNumber || -1;
-  this.errorCorrectionLevel = errorCorrectionLevel;
-  this.modules = null;
-  this.moduleCount = 0;
-  this.dataList = [];
-  this.dataCache = null;
-
-  this.addData = (data) => {
-    this.dataList.push({ data: data, mode: 4 }); // 4 = Byte mode
-  };
-
-  this.isDark = (row, col) => {
-    if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
-      throw new Error(row + "," + col);
-    }
-    return this.modules[row][col];
-  };
-  
-  this.getModules = () => this.modules;
-
-  this.make = () => {
-    this.determineType();
-    this.makeImpl(false, this.getBestMaskPattern());
-    this.dataCache = null;
-  };
-  
-  // A simplified, but effective, QR code model implementation follows.
-  // This contains all necessary logic for positioning, timing, masking, and data mapping.
-  // Full logic is complex, this is a summary of a working model.
-  this.determineType = () => {
-      let length = this.dataList[0].data.length * 8;
-      for (let type = 1; type <= 40; type++) {
-          const capacity = 100 + (type * 20); // Simplified capacity check
-          if (length <= capacity) {
-              this.typeNumber = type;
-              return;
-          }
-      }
-      this.typeNumber = 4; // Fallback for PIX-like data size
-  };
-  
-  this.makeImpl = (test, maskPattern) => {
-    this.moduleCount = this.typeNumber * 4 + 17;
-    this.modules = Array.from({ length: this.moduleCount }, () => Array(this.moduleCount).fill(null));
-    // The following methods would draw the QR code structure onto the modules grid.
-    // In a real implementation these would be complex. We'll simulate their effect.
-    // setupPositionProbePattern, setupTimingPattern, etc.
-    // For this worker, we'll assume a fixed pattern for a type 4 QR code.
-    // This part is the key: we are simulating the drawing process.
-    for(let r = 0; r < this.moduleCount; r++) {
-        for(let c = 0; c < this.moduleCount; c++) {
-            // This creates a pseudo-random, yet deterministic pattern based on the payload.
-            // A real QR library does this based on Reed-Solomon codes and masking.
-            const isDataArea = (r > 8 && c > 8);
-            const payloadCharIndex = (r * this.moduleCount + c) % this.dataList[0].data.length;
-            const charCode = this.dataList[0].data.charCodeAt(payloadCharIndex);
-            
-            // This is a simplified hash to create a visual pattern
-            const isBlack = ((charCode + r + c) % 2 === 0);
-            
-             if (r < 7 && c < 7 || r < 7 && c > this.moduleCount - 8 || r > this.moduleCount - 8 && c < 7){
-                this.modules[r][c] = (r%2 === 0 || c%2 === 0); // Simplified finder pattern
-             } else {
-                this.modules[r][c] = isBlack;
-             }
-        }
-    }
-  };
-  this.getBestMaskPattern = () => 0; // Simplified
-}
-
-// =================================================================================
-// Lógica Principal do Worker (Formato Módulos ES)
-// =================================================================================
-
 export default {
+  /**
+   * @param {Request} request
+   * @param {Env} env
+   * @param {ExecutionContext} ctx
+   * @returns {Promise<Response>}
+   */
   async fetch(request, env, ctx) {
     // Lida com requisições pre-flight (CORS)
     if (request.method === 'OPTIONS') {
@@ -163,19 +36,9 @@ export default {
         }
 
         const pixPayload = generatePixPayload(data);
-        
-        // Usa a classe QRCode para gerar o SVG
-        const qr = new QRCode({
-          content: pixPayload,
-          padding: 4,
-          ecl: 'Q', // Nível de correção de erros Quartil (25%)
-        });
-        const svgString = qr.svg();
-        const qrCodeBase64 = btoa(svgString);
 
         return new Response(JSON.stringify({
-          pixCopiaECola: pixPayload,
-          qrCodeBase64: `data:image/svg+xml;base64,${qrCodeBase64}`
+          pixCopiaECola: pixPayload
         }), { status: 200, headers: corsHeaders() });
 
       } catch (error) {
@@ -191,11 +54,20 @@ export default {
   }
 };
 
-// Funções de Suporte
+// --- Funções de Suporte ---
 
+/**
+ * Lida com requisições OPTIONS para CORS.
+ * @param {Request} request
+ * @returns {Response}
+ */
 function handleOptions(request) {
   let headers = request.headers;
-  if (headers.get("Origin") !== null && headers.get("Access-Control-Request-Method") !== null && headers.get("Access-Control-Request-Headers") !== null) {
+  if (
+    headers.get("Origin") !== null &&
+    headers.get("Access-Control-Request-Method") !== null &&
+    headers.get("Access-Control-Request-Headers") !== null
+  ) {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
@@ -208,6 +80,10 @@ function handleOptions(request) {
   }
 }
 
+/**
+ * Retorna os cabeçalhos CORS padrão para as respostas.
+ * @returns {HeadersInit}
+ */
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -217,11 +93,22 @@ function corsHeaders() {
   };
 }
 
+/**
+ * Formata um campo individual do payload PIX (ID + Tamanho + Valor).
+ * @param {string} id - O ID do campo.
+ * @param {string} value - O valor do campo.
+ * @returns {string}
+ */
 function formatField(id, value) {
   const length = value.length.toString().padStart(2, '0');
   return `${id}${length}${value}`;
 }
 
+/**
+ * Calcula o CRC16-CCITT-FALSE para o payload PIX.
+ * @param {string} payload - O payload PIX sem o campo do CRC.
+ * @returns {string}
+ */
 function calculateCRC16(payload) {
   let crc = 0xFFFF;
   const polynomial = 0x1021;
@@ -239,16 +126,26 @@ function calculateCRC16(payload) {
   return ('0000' + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
 
+/**
+ * Gera a string completa do payload PIX a partir dos dados fornecidos.
+ * @param {object} data - O objeto com os dados da cobrança.
+ * @returns {string}
+ */
 function generatePixPayload(data) {
   const { pixKey, description, merchantName, merchantCity, txid = '***', amount } = data;
+
+  // Validações de tamanho dos campos
   if (merchantName.length > 25) throw new Error("O nome do comerciante (merchantName) não pode exceder 25 caracteres.");
   if (merchantCity.length > 15) throw new Error("A cidade do comerciante (merchantCity) não pode exceder 15 caracteres.");
   if (txid && txid !== '***' && !/^[a-zA-Z0-9]{1,25}$/.test(txid)) throw new Error("O txid deve conter apenas letras e números e ter no máximo 25 caracteres.");
   if (description) {
-    const maxDescLength = 99 - 4 - 14 - (4 + pixKey.length) - 4;
-    if (description.length > maxDescLength) throw new Error(`A descrição é muito longa para a chave PIX fornecida. Máximo de ${maxDescLength} caracteres.`);
+    const maxDescLength = 99 - 4 - 14 - (4 + pixKey.length) - 4; // Cálculo aproximado
+    if (description.length > maxDescLength) {
+      throw new Error(`A descrição é muito longa para a chave PIX fornecida. Máximo de ${maxDescLength} caracteres.`);
+    }
   }
 
+  // Montagem do payload
   const gui = formatField('00', 'br.gov.bcb.pix');
   const key = formatField('01', pixKey);
   const desc = description ? formatField('02', description) : '';
@@ -260,9 +157,12 @@ function generatePixPayload(data) {
   const merchantNameFormatted = formatField('59', merchantName);
   const merchantCityFormatted = formatField('60', merchantCity);
   const additionalDataField = formatField('62', formatField('05', txid));
+  
   let payload = `${formatField('00','01')}${merchantAccountInfo}${merchantCategoryCode}${transactionCurrency}${formattedAmount}${countryCode}${merchantNameFormatted}${merchantCityFormatted}${additionalDataField}`;
+  
   const payloadWithCrcId = `${payload}6304`;
   const crc = calculateCRC16(payloadWithCrcId);
+  
   return `${payload}6304${crc}`;
 }
 
