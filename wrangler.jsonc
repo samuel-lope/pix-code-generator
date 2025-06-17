@@ -6,7 +6,7 @@
   "main": "src/worker.js",
   "routes": [
     {
-      "pattern": "pix.api.sl.app.br",
+      "pattern": "api.sl.app.br",
       "custom_domain": true
     }
   ],
