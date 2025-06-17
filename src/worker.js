@@ -146,7 +146,7 @@ function generatePixPayload(data) {
   }
 
   // Montagem do payload
-  const gui = formatField('00', 'br.gov.bcb.pix');
+  const gui = formatField('00', 'BR.GOV.BCB.PI');
   const key = formatField('01', pixKey);
   const desc = description ? formatField('02', description) : '';
   const merchantAccountInfo = formatField('26', `${gui}${key}${desc}`);
