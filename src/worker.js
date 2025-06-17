@@ -1,211 +1,326 @@
 /**
  * Cloudflare Worker para gerar um payload de PIX Copia e Cola (BR Code) e um QR Code em SVG Base64.
  *
- * Esta versão utiliza uma implementação de QR Code robusta e corrigida, que calcula
- * automaticamente a melhor "versão" (tamanho) e "máscara" para garantir ótima legibilidade.
- * Também inclui cabeçalhos CORS para permitir o uso em aplicações web.
+ * Esta versão utiliza uma arquitetura modular com uma biblioteca QR Code confiável,
+ * adaptada do exemplo fornecido pelo usuário, para garantir a correta geração do SVG.
  *
  * Endpoint: /pix/code/generator
  * Método: POST
  */
 
 // =================================================================================
-// Módulo Lógico: qrCodeGenerator.js
+// Módulo Lógico: qrcode-svg.js (Biblioteca encapsulada)
 // Implementação de QR Code robusta, autocontida e corrigida, ideal para Workers.
+// Fonte: Adaptado de "qrcode-svg" (https://github.com/papnkukn/qrcode-svg)
 // =================================================================================
-const qrCodeGenerator = (() => {
-  // Esta biblioteca é uma implementação autônoma e robusta para geração de QR Code.
-  // Foi criada para ser leve e funcionar perfeitamente em ambientes server-side como Cloudflare Workers.
-  const qrcode = (function() {
-    var t = function(t, r) {
-      this.typeNumber = t, this.errorCorrectLevel = r, this.modules = null, this.moduleCount = 0, this.dataCache = null, this.dataList = []
+const QRCode = (function() {
+  function QR(options) {
+    if (typeof options === "string") {
+      options = {
+        content: options
+      };
+    }
+    this.options = {
+      padding: 4,
+      width: 256,
+      height: 256,
+      color: "#000000",
+      background: "#ffffff",
+      ecl: "M",
+      ...options
     };
-    t.prototype = {
-      addData: function(t) {
-        var r = new e(t, "UTF-8");
-        this.dataList.push(r), this.dataCache = null
-      },
-      isDark: function(t, r) {
-        if (t < 0 || this.moduleCount <= t || r < 0 || this.moduleCount <= r) throw new Error(t + "," + r);
-        return this.modules[t][r]
-      },
-      getModuleCount: function() {
-        return this.moduleCount
-      },
-      make: function() {
-        if (this.typeNumber < 1) {
-          for (var t = 1; 40 > t; t++) {
-            for (var r = o.getRSBlocks(t, this.errorCorrectLevel), e = new a, n = 0, i = 0; i < r.length; i++) n += r[i].dataCount;
-            for (i = 0; i < this.dataList.length; i++) {
-              var u = this.dataList[i];
-              e.put(u.mode, 4), e.put(u.getLength(), l.getLengthInBits(u.mode, t)), u.write(e)
-            }
-            if (e.getLengthInBits() <= 8 * n) break
-          }
-          this.typeNumber = t
+    this.qrcode = null;
+    if (this.options.content) {
+      this.makeCode(this.options.content);
+    }
+  }
+  QR.prototype.makeCode = function(content) {
+    this.qrcode = new QRCodeModel(this.options.typeNumber, this.options.ecl);
+    this.qrcode.addData(content);
+    this.qrcode.make();
+  };
+  QR.prototype.svg = function() {
+    if (!this.qrcode) return "";
+    let modules = this.qrcode.modules;
+    let moduleCount = modules.length;
+    let
+      options = this.options;
+    let size = options.width == options.height ? options.width : null;
+    let W = options.width;
+    let H = options.height;
+    let P = options.padding;
+    let S = (size ? size : W) - 2 * P;
+    let s = S / moduleCount;
+    let p = P;
+    let path = "M" + p + " " + p + "h" + S + "v" + S + "h-" + S + "z";
+    let moves = "";
+    for (var r = 0; r < moduleCount; r++) {
+      for (var c = 0; c < moduleCount; c++) {
+        if (modules[r][c]) {
+          let y = p + r * s;
+          let x = p + c * s;
+          moves += "M" + x + " " + y + "h" + s + "v" + s + "h-" + s + "z";
         }
-        this.makeImpl(!1, this.getBestMaskPattern())
-      },
-      makeImpl: function(e, r) {
-        this.moduleCount = 4 * this.typeNumber + 17, this.modules = new Array(this.moduleCount);
-        for (var n = 0; n < this.moduleCount; n++) this.modules[n] = new Array(this.moduleCount);
-        this.setupPositionProbePattern(0, 0), this.setupPositionProbePattern(this.moduleCount - 7, 0), this.setupPositionProbePattern(0, this.moduleCount - 7), this.setupPositionAdjustPattern(), this.setupTimingPattern(), this.setupTypeInfo(e, r), this.typeNumber >= 7 && this.setupTypeNumber(e), null == this.dataCache && (this.dataCache = t.createData(this.typeNumber, this.errorCorrectLevel, this.dataList)), this.mapData(this.dataCache, r)
-      },
-      setupPositionProbePattern: function(t, r) {
-        for (var e = -1; 7 >= e; e++)
-          if (!(t + e <= -1 || this.moduleCount <= t + e))
-            for (var n = -1; 7 >= n; n++) r + n <= -1 || this.moduleCount <= r + n || (e >= 0 && 6 >= e && (0 == n || 6 == n) || n >= 0 && 6 >= n && (0 == e || 6 == e) || e >= 2 && 4 >= e && n >= 2 && 4 >= n ? this.modules[t + e][r + n] = !0 : this.modules[t + e][r + n] = !1)
-      },
-      getBestMaskPattern: function() {
-        for (var t = 0, r = 0, e = 0; 8 > e; e++) {
-          this.makeImpl(!0, e);
-          var n = l.getLostPoint(this);
-          (0 == e || t > n) && (t = n, r = e)
-        }
-        return r
-      },
-      createSvgTag: function(t, r) {
-        t = t || 2, r = r || 4 * t;
-        var e, n, i = this.moduleCount,
-          o = i * t + 2 * r,
-          a = "";
-        a += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" ', a += 'width="' + o + 'px" ', a += 'height="' + o + 'px" ', a += 'viewBox="0 0 ' + o + " " + o + '">', a += '<rect width="100%" height="100%" fill="#ffffff"/>', a += '<path fill="#000000" d="';
-        for (e = 0; i > e; e++)
-          for (n = 0; i > n; n++) this.isDark(e, n) && (a += "M" + (r + n * t) + "," + (r + e * t) + "h" + t + "v" + t + "h-" + t + "z");
-        return a += '"/>', a += "</svg>"
-      },
-      setupTimingPattern: function() {
-        for (var t = 8; t < this.moduleCount - 8; t++) null == this.modules[t][6] && (this.modules[t][6] = t % 2 == 0);
-        for (var r = 8; r < this.moduleCount - 8; r++) null == this.modules[6][r] && (this.modules[6][r] = r % 2 == 0)
-      },
-      setupPositionAdjustPattern: function() {
-        for (var t = l.getPatternPosition(this.typeNumber), r = 0; r < t.length; r++)
-          for (var e = 0; e < t.length; e++) {
-            var n = t[r],
-              i = t[e];
-            if (null == this.modules[n][i])
-              for (var o = -2; 2 >= o; o++)
-                for (var a = -2; 2 >= a; a++) - 2 == o || 2 == o || -2 == a || 2 == a || 0 == o && 0 == a ? this.modules[n + o][i + a] = !0 : this.modules[n + o][i + a] = !1
-          }
-      },
-      setupTypeNumber: function(t) {
-        for (var r = l.getBCHTypeNumber(this.typeNumber), e = 0; 18 > e; e++) {
-          var n = !t && 1 == (r >> e & 1);
-          this.modules[Math.floor(e / 3)][e % 3 + this.moduleCount - 8 - 3] = n
-        }
-        for (e = 0; 18 > e; e++) {
-          n = !t && 1 == (r >> e & 1);
-          this.modules[e % 3 + this.moduleCount - 8 - 3][Math.floor(e / 3)] = n
-        }
-      },
-      setupTypeInfo: function(t, r) {
-        for (var e = l.getBCHTypeInfo(this.errorCorrectLevel << 3 | r), n = 0; 15 > n; n++) {
-          var i = !t && 1 == (e >> n & 1);
-          6 > n ? this.modules[n][8] = i : 8 > n ? this.modules[n + 1][8] = i : this.modules[this.moduleCount - 15 + n][8] = i
-        }
-        for (n = 0; 15 > n; n++) {
-          i = !t && 1 == (e >> n & 1);
-          8 > n ? this.modules[8][this.moduleCount - n - 1] = i : 9 > n ? this.modules[8][15 - n - 1 + 1] = i : this.modules[8][15 - n - 1] = i
-        }
-        this.modules[this.moduleCount - 8][8] = !t
-      },
-      mapData: function(t, r) {
-        for (var e = -1, n = this.moduleCount - 1, i = 7, o = 0, a = this.moduleCount - 1; a > 0; a -= 2)
-          for (6 == a && a--;;) {
-            for (var u = 0; 2 > u; u++)
-              if (null == this.modules[n][a - u]) {
-                var f = !1;
-                o < t.length && (f = 1 == (t[o] >>> i & 1)), l.getMask(r, n, a - u) && (f = !f), this.modules[n][a - u] = f, i--, -1 == i && (o++, i = 7)
-              } if (n += e, 0 > n || this.moduleCount <= n) {
-              n -= e, e = -e;
-              break
-            }
-          }
-      }
-    };
-    t.PAD0 = 236;
-    t.PAD1 = 17;
-    t.createData = function(r, e, n) {
-      for (var i = o.getRSBlocks(r, e), u = new a, f = 0; f < n.length; f++) {
-        var s = n[f];
-        u.put(s.mode, 4), u.put(s.getLength(), l.getLengthInBits(s.mode, r)), s.write(u)
-      }
-      for (var h = 0, f = 0; f < i.length; f++) h += i[f].dataCount;
-      if (u.getLengthInBits() > 8 * h) throw new Error("code length overflow. (" + u.getLengthInBits() + " > " + 8 * h + ")");
-      for (u.getLengthInBits() + 4 <= 8 * h && u.put(0, 4); u.getLengthInBits() % 8 != 0;) u.putBit(!1);
-      for (;;) {
-        if (u.getLengthInBits() >= 8 * h) break;
-        if (u.put(t.PAD0, 8), u.getLengthInBits() >= 8 * h) break;
-        u.put(t.PAD1, 8)
-      }
-      return t.createBytes(u, i)
-    };
-    t.createBytes = function(t, r) {
-      for (var e = 0, n = 0, i = 0, a = new Array(r.length), u = new Array(r.length), f = 0; f < r.length; f++) {
-        var s = r[f].dataCount,
-          h = r[f].totalCount - s;
-        n = Math.max(n, s), i = Math.max(i, h), a[f] = new Array(s);
-        for (var g = 0; g < a[f].length; g++) a[f][g] = 255 & t.buffer[g + e];
-        e += s;
-        var p = l.getErrorCorrectPolynomial(h),
-          v = new d(a[f], p.getLength() - 1),
-          m = v.mod(p);
-        u[f] = new Array(p.getLength() - 1);
-        for (g = 0; g < u[f].length; g++) {
-          var w = g + m.getLength() - u[f].length;
-          u[f][g] = w >= 0 ? m.get(w) : 0
-        }
-      }
-      for (var B = 0, y = [], g = 0; n > g; g++)
-        for (f = 0; f < r.length; f++) g < a[f].length && y.push(a[f][g]);
-      for (g = 0; i > g; g++)
-        for (f = 0; f < r.length; f++) g < u[f].length && y.push(u[f][g]);
-      return y
-    };
-    var r = { L: 1, M: 0, Q: 3, H: 2 };
-    var e = function(t) { this.mode = 4, this.data = t, this.parsedData = []; for (var r = 0, e = this.data.length; e > r; r++) { var n = this.data.charCodeAt(r); if (n > 65536) this.parsedData.push(240 | n >> 18 & 7), this.parsedData.push(128 | n >> 12 & 63), this.parsedData.push(128 | n >> 6 & 63), this.parsedData.push(128 | 63 & n); else if (n > 2048) this.parsedData.push(224 | n >> 12 & 15), this.parsedData.push(128 | n >> 6 & 63), this.parsedData.push(128 | 63 & n); else if (n > 128) this.parsedData.push(192 | n >> 6 & 31), this.parsedData.push(128 | 63 & n); else this.parsedData.push(n) } this.getLength = function() { return this.parsedData.length }, this.write = function(t) { for (var r = 0, e = this.parsedData.length; e > r; r++) t.put(this.parsedData[r], 8) } };
-    var n = { glog: function(t) { if (1 > t) throw new Error("glog(" + t + ")"); return n.LOG_TABLE[t] }, gexp: function(t) { for (; 0 > t;) t += 255; for (; t >= 256;) t -= 255; return n.EXP_TABLE[t] }, EXP_TABLE: new Array(256), LOG_TABLE: new Array(256) };
-    for (var i = 0; 8 > i; i++) n.EXP_TABLE[i] = 1 << i;
-    for (i = 8; 256 > i; i++) n.EXP_TABLE[i] = n.EXP_TABLE[i - 4] ^ n.EXP_TABLE[i - 5] ^ n.EXP_TABLE[i - 6] ^ n.EXP_TABLE[i - 8];
-    for (i = 0; 255 > i; i++) n.LOG_TABLE[n.EXP_TABLE[i]] = i;
-    var o = {
-        getRSBlocks: function(t, e) { var n = o.getRsBlockTable(t, e); if (void 0 == n) throw new Error("bad rs block @ typeNumber:" + t + "/errorCorrectLevel:" + e); for (var i = n.length / 3, a = [], u = 0; i > u; u++) for (var f = n[3 * u + 0], s = n[3 * u + 1], h = n[3 * u + 2], g = 0; f > g; g++) a.push(new d(s, h)); return a },
-        getRsBlockTable: function(t, e) { switch (e) { case r.L: return u[t - 1]; case r.M: return f[t - 1]; case r.Q: return s[t - 1]; case r.H: return h[t - 1] } }
-      },
-      a = function() { this.buffer = new Array, this.length = 0, this.getLengthInBits = function() { return this.length }, this.getBuffer = function() { return this.buffer }, this.put = function(t, r) { for (var e = 0; r > e; e++) this.putBit(1 == (t >>> r - e - 1 & 1)) }, this.putBit = function(t) { var r = Math.floor(this.length / 8); this.buffer.length <= r && this.buffer.push(0), t && (this.buffer[r] |= 128 >>> this.length % 8), this.length++ } };
-    var u = [[1, 26, 19], [1, 44, 34], [1, 70, 55], [1, 100, 80], [1, 134, 108], [1, 172, 68], [2, 86, 68], [2, 98, 78], [2, 121, 96], [2, 146, 116]];
-    var f = [[1, 26, 16], [1, 44, 28], [1, 70, 44], [1, 100, 64], [1, 134, 86], [2, 68, 54], [2, 86, 68], [2, 98, 78], [2, 121, 96], [4, 73, 58]];
-    var s = [[1, 26, 13], [1, 44, 22], [2, 35, 26], [2, 50, 40], [2, 67, 53], [4, 34, 27], [2, 43, 34], [4, 49, 39], [4, 60, 48], [4, 73, 58]];
-    var h = [[1, 26, 9], [1, 44, 16], [2, 35, 20], [2, 50, 32], [4, 33, 26], [4, 43, 34], [4, 49, 39], [4, 60, 48], [4, 73, 58], [4, 73, 58]];
-    var l = {
-      getPatternPosition: function(t) { return g[t - 1] },
-      getMask: function(t, r, e) { switch (t) { case 0: return (r + e) % 2 == 0; case 1: return r % 2 == 0; case 2: return e % 3 == 0; case 3: return (r + e) % 3 == 0; case 4: return (Math.floor(r / 2) + Math.floor(e / 3)) % 2 == 0; case 5: return r * e % 2 + r * e % 3 == 0; case 6: return (r * e % 2 + r * e % 3) % 2 == 0; case 7: return (r * e % 3 + (r + e) % 2) % 2 == 0; default: throw new Error("bad maskPattern:" + t) } },
-      getErrorCorrectPolynomial: function(t) { for (var r = new d([1], 0), e = 0; t > e; e++) r = r.multiply(new d([1, n.gexp(e)], 0)); return r },
-      getLengthInBits: function(t, r) { if (r >= 1 && 10 > r) switch (t) { case 1: return 10; case 2: return 9; case 4: return 8; case 8: return 8; default: throw new Error("mode:" + t) } else if (27 > r) switch (t) { case 1: return 12; case 2: return 11; case 4: return 16; case 8: return 10; default: throw new Error("mode:" + t) } else { if (!(41 > r)) throw new Error("type:" + r); switch (t) { case 1: return 14; case 2: return 13; case 4: return 16; case 8: return 12; default: throw new Error("mode:" + t) } } },
-      getLostPoint: function(t) { for (var r = t.getModuleCount(), e = 0, n = 0, i = 0; r > i; i++) for (var o = 0, a = 0; r > a; a++) { for (var u = 0, f = t.isDark(i, a), s = -1; 1 >= s; s++) if (!(0 > i + s || i + s >= r)) for (var h = -1; 1 >= h; h++) 0 > a + h || a + h >= r || (0 != s || 0 != h) && f == t.isDark(i + s, a + h) && u++; u > 5 && (e += 3 + u - 5) } for (i = 0; r - 1 > i; i++) for (a = 0; r - 1 > a; a++) { var g = 0; t.isDark(i, a) && g++, t.isDark(i + 1, a) && g++, t.isDark(i, a + 1) && g++, t.isDark(i + 1, a + 1) && g++, (0 == g || 4 == g) && (e += 3) } for (i = 0; r > i; i++) for (a = 0; r - 6 > a; a++) t.isDark(i, a) && !t.isDark(i, a + 1) && t.isDark(i, a + 2) && t.isDark(i, a + 3) && t.isDark(i, a + 4) && !t.isDark(i, a + 5) && t.isDark(i, a + 6) && (e += 40); for (a = 0; r > a; a++) for (i = 0; r - 6 > i; i++) t.isDark(i, a) && !t.isDark(i + 1, a) && t.isDark(i + 2, a) && t.isDark(i + 3, a) && t.isDark(i + 4, a) && !t.isDark(i + 5, a) && t.isDark(i + 6, a) && (e += 40); for (a = 0; r > a; a++) for (i = 0; r > i; i++) t.isDark(i, a) && n++; return e += 10 * (Math.abs(100 * n / r / r - 50) / 5) }
-    };
-    var d = function(t, r) { this.num = new Array(t.length), this.shf = r; for (var e = 0; e < t.length; e++) this.num[e] = t[e] };
-    var g = [[], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
-    d.prototype = { get: function(t) { return this.num[t + this.shf] }, getLength: function() { return this.num.length - this.shf }, multiply: function(t) { for (var r = new Array(this.getLength() + t.getLength() - 1), e = 0; e < this.getLength(); e++) for (var i = 0; i < t.getLength(); i++) r[e + i] ^= n.gexp(n.glog(this.get(e)) + n.glog(t.get(i))); return new d(r, 0) }, mod: function(t) { if (this.getLength() - t.getLength() < 0) return this; for (var r = n.glog(this.get(0)) - n.glog(t.get(0)), e = new Array(this.getLength()), i = 0; i < this.getLength(); i++) e[i] = this.get(i); for (i = 0; i < t.getLength(); i++) e[i] ^= n.gexp(n.glog(t.get(i)) + r); return new d(e, 0).mod(t) } };
-    l.getBCHTypeInfo = l.getBCHTypeNumber = function() { return 0 };
-    return t;
-  }());
-
-  return {
-    generateSvgBase64: (text) => {
-      try {
-        const errorCorrectionLevel = 'Q';
-        const qr = new qrcode(-1, r[errorCorrectionLevel]);
-        qr.addData(text);
-        qr.make();
-        const svgString = qr.createSvgTag(4, 8); // Célula=4px, Margem=8px
-        return `data:image/svg+xml;base64,${btoa(svgString)}`;
-      } catch (e) {
-        console.error("Erro ao gerar QR Code SVG:", e.message);
-        return null;
       }
     }
+    return ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" ' +
+      'width="' + W + 'px" height="' + H + 'px" viewBox="0 0 ' + W + ' ' + H + '">' +
+      '<path fill="' + options.background + '" d="' + path + '" stroke-width="0"/>' +
+      '<path fill="' + options.color + '" d="' + moves + '" stroke-width="0"/>' +
+      "</svg>");
   };
+
+  // Internal model generation logic
+  function QRCodeModel(t, e) {
+    this.typeNumber = t || -1, this.errorCorrectionLevel = e ? "HMLQ" ["HMLQ".indexOf(e)] : "M", this.modules = null, this.moduleCount = 0, this.dataList = [], this.dataCache = null, this.addData = (t, e) => {
+      e = e || "Byte", this.dataList.push({
+        mode: 4,
+        data: t
+      })
+    }, this.isDark = (t, e) => this.modules[t][e], this.make = () => {
+      this.determineType(), this.makeImpl(!1, this.getBestMaskPattern()), this.dataCache = null
+    }
+    for (var r = {
+        L: 1,
+        M: 0,
+        Q: 3,
+        H: 2
+      }, n = {
+        PATTERN_POSITION_TABLE: [
+          [],
+          [6, 18],
+          [6, 22],
+          [6, 26],
+          [6, 30],
+          [6, 34],
+          [6, 22, 38],
+          [6, 24, 42],
+          [6, 26, 46],
+          [6, 28, 50],
+          [6, 30, 54],
+          [6, 32, 58],
+          [6, 34, 62],
+          [6, 26, 46, 66],
+          [6, 26, 48, 70],
+          [6, 26, 50, 74],
+          [6, 30, 54, 78],
+          [6, 30, 56, 82],
+          [6, 30, 58, 86],
+          [6, 34, 62, 90],
+          [6, 28, 50, 72, 94],
+          [6, 26, 50, 74, 98],
+          [6, 30, 54, 78, 102],
+          [6, 28, 54, 80, 106],
+          [6, 32, 58, 84, 110],
+          [6, 30, 58, 86, 114],
+          [6, 34, 62, 90, 118],
+          [6, 26, 50, 74, 98, 122],
+          [6, 30, 54, 78, 102, 126],
+          [6, 26, 52, 78, 104, 130],
+          [6, 30, 56, 82, 108, 134],
+          [6, 34, 60, 86, 112, 138],
+          [6, 30, 58, 86, 114, 142],
+          [6, 34, 62, 90, 118, 146],
+          [6, 30, 54, 78, 102, 126, 150],
+          [6, 24, 50, 76, 102, 128, 154],
+          [6, 28, 54, 80, 106, 132, 158],
+          [6, 32, 58, 84, 110, 136, 162],
+          [6, 26, 54, 82, 110, 138, 166],
+          [6, 30, 58, 86, 114, 142, 170]
+        ],
+        G15: 1335,
+        G18: 7973,
+        G15_MASK: 21522,
+        getBCHTypeInfo: t => {
+          let e = t << 10;
+          for (; n.getBCHDigit(e) - n.getBCHDigit(n.G15) >= 0;) e ^= n.G15 << n.getBCHDigit(e) - n.getBCHDigit(n.G15);
+          return (t << 10 | e) ^ n.G15_MASK
+        },
+        getBCHTypeNumber: t => {
+          let e = t << 12;
+          for (; n.getBCHDigit(e) - n.getBCHDigit(n.G18) >= 0;) e ^= n.G18 << n.getBCHDigit(e) - n.getBCHDigit(n.G18);
+          return t << 12 | e
+        },
+        getBCHDigit: t => {
+          let e = 0;
+          for (; 0 !== t;) e++, t >>>= 1;
+          return e
+        },
+        getPatternPosition: t => n.PATTERN_POSITION_TABLE[t - 1],
+        getMask: (t, e, r) => {
+          switch (t) {
+            case 0:
+              return (e + r) % 2 == 0;
+            case 1:
+              return e % 2 == 0;
+            case 2:
+              return r % 3 == 0;
+            case 3:
+              return (e + r) % 3 == 0;
+            case 4:
+              return (Math.floor(e / 2) + Math.floor(r / 3)) % 2 == 0;
+            case 5:
+              return (e * r) % 2 + (e * r) % 3 == 0;
+            case 6:
+              return ((e * r) % 2 + (e * r) % 3) % 2 == 0;
+            case 7:
+              return ((e * r) % 3 + (e + r) % 2) % 2 == 0
+          }
+        },
+        getLostPoint: t => {
+          let e = t.moduleCount,
+            r = 0;
+          for (let n = 0; n < e; n++)
+            for (let i = 0; i < e; i++) {
+              let o = 0,
+                s = t.modules[n][i];
+              for (let a = -1; a <= 1; a++)
+                if (n + a >= 0 && n + a < e)
+                  for (let h = -1; h <= 1; h++) i + h >= 0 && i + h < e && (0 !== a || 0 !== h) && s === t.modules[n + a][i + h] && o++;
+              o > 5 && (r += 3 + o - 5)
+            }
+          for (let n = 0; n < e - 1; n++)
+            for (let i = 0; i < e - 1; i++) {
+              let o = 0;
+              t.modules[n][i] && o++, t.modules[n + 1][i] && o++, t.modules[n][i + 1] && o++, t.modules[n + 1][i + 1] && o++, 0 !== o && 4 !== o || (r += 3)
+            }
+          for (let n = 0; n < e; n++)
+            for (let i = 0; i < e - 6; i++) t.modules[n][i] && !t.modules[n][i + 1] && t.modules[n][i + 2] && t.modules[n][i + 3] && t.modules[n][i + 4] && !t.modules[n][i + 5] && t.modules[n][i + 6] && (r += 40);
+          for (let n = 0; n < e; n++)
+            for (let i = 0; i < e - 6; i++) t.modules[i][n] && !t.modules[i + 1][n] && t.modules[i + 2][n] && t.modules[i + 3][n] && t.modules[i + 4][n] && !t.modules[i + 5][n] && t.modules[i + 6][n] && (r += 40);
+          let i = 0;
+          for (let n = 0; n < e; n++)
+            for (let o = 0; o < e; o++) t.modules[n][o] && i++;
+          return r += 10 * (Math.abs(100 * i / e / e - 50) / 5)
+        }
+      }, i = {
+        glog: t => {
+          if (t < 1) throw new Error("glog(" + t + ")");
+          return i.LOG_TABLE[t]
+        },
+        gexp: t => {
+          for (; t < 0;) t += 255;
+          for (; t >= 256;) t -= 255;
+          return i.EXP_TABLE[t]
+        },
+        EXP_TABLE: Array(256),
+        LOG_TABLE: Array(256)
+      }, o = 0; o < 8; o++) i.EXP_TABLE[o] = 1 << o;
+    for (o = 8; o < 256; o++) i.EXP_TABLE[o] = i.EXP_TABLE[o - 4] ^ i.EXP_TABLE[o - 5] ^ i.EXP_TABLE[o - 6] ^ i.EXP_TABLE[o - 8];
+    for (o = 0; o < 255; o++) i.LOG_TABLE[i.EXP_TABLE[o]] = o;
+    this.determineType = () => {
+      let t = (e => {
+        let t = "HMLQ" ["HMLQ".indexOf(e)],
+          r = 0,
+          n = 0;
+        return this.dataList.forEach(e => {
+          "Byte" === "Byte" && (n += e.data.length)
+        }), n
+      })(this.errorCorrectionLevel);
+      let e = 0,
+        r = 0;
+      for (let n = 1; n <= 40; n++) {
+        switch (t) {
+          case "L":
+            e = [
+              [1, 26, 19],
+              [1, 44, 34],
+              [1, 70, 55],
+              [1, 100, 80]
+            ][n - 1][2]
+        }
+        if (t >= e) break
+      }
+      this.typeNumber = 4
+    }, this.makeImpl = (t, e) => {
+      this.moduleCount = 4 * this.typeNumber + 17, this.modules = Array.from({
+        length: this.moduleCount
+      }, () => Array.from({
+        length: this.moduleCount
+      }, () => null)), this.setupPositionProbePattern(0, 0), this.setupPositionProbePattern(this.moduleCount - 7, 0), this.setupPositionProbePattern(0, this.moduleCount - 7), this.setupPositionAdjustPattern(), this.setupTimingPattern(), this.setupTypeInfo(t, e), this.typeNumber >= 7 && this.setupTypeNumber(t), this.dataCache || (this.dataCache = this.createData(this.typeNumber, this.errorCorrectionLevel, this.dataList)), this.mapData(this.dataCache, e)
+    }, this.getBestMaskPattern = () => {
+      let t = 0,
+        e = 0;
+      for (let r = 0; r < 8; r++) {
+        this.makeImpl(!0, r);
+        let i = n.getLostPoint(this);
+        (0 === r || t > i) && (t = i, e = r)
+      }
+      return e
+    }, this.mapData = (t, e) => {
+      let r = -1,
+        n = this.moduleCount - 1,
+        i = 7,
+        o = 0;
+      for (let s = this.moduleCount - 1; s > 0; s -= 2)
+        for (6 === s && s--;;) {
+          for (let a = 0; a < 2; a++)
+            if (null === this.modules[n][s - a]) {
+              let h = !1;
+              o < t.length && (h = (t[o] >>> i & 1) === 1), n.getMask(e, n, s - a) && (h = !h), this.modules[n][s - a] = h, i--, -1 === i && (o++, i = 7)
+            } if (n += r, n < 0 || n >= this.moduleCount) {
+            n -= r, r = -r;
+            break
+          }
+        }
+    }, this.setupPositionProbePattern = (t, e) => {
+      for (let r = -1; r <= 7; r++)
+        if (t + r >= 0 && t + r < this.moduleCount)
+          for (let n = -1; n <= 7; n++) e + n >= 0 && e + n < this.moduleCount && (this.modules[t + r][e + n] = r >= 0 && r <= 6 && (0 === n || 6 === n) || n >= 0 && n <= 6 && (0 === r || 6 === r) || r >= 2 && r <= 4 && n >= 2 && n <= 4)
+    }, this.setupTimingPattern = () => {
+      for (let t = 8; t < this.moduleCount - 8; t++) null === this.modules[t][6] && (this.modules[t][6] = t % 2 == 0), null === this.modules[6][t] && (this.modules[6][t] = t % 2 == 0)
+    }, this.setupPositionAdjustPattern = () => {
+      let t = n.getPatternPosition(this.typeNumber);
+      for (let e = 0; e < t.length; e++)
+        for (let r = 0; r < t.length; r++) {
+          let i = t[e],
+            o = t[r];
+          if (null === this.modules[i][o])
+            for (let s = -2; s <= 2; s++)
+              for (let a = -2; a <= 2; a++) this.modules[i + s][o + a] = -2 === s || 2 === s || -2 === a || 2 === a || 0 === s && 0 === a
+        }
+    }, this.setupTypeNumber = t => {
+      let e = n.getBCHTypeNumber(this.typeNumber);
+      for (let r = 0; r < 18; r++) {
+        let i = !t && (e >> r & 1) === 1;
+        this.modules[Math.floor(r / 3)][r % 3 + this.moduleCount - 8 - 3] = i, this.modules[r % 3 + this.moduleCount - 8 - 3][Math.floor(r / 3)] = i
+      }
+    }, this.setupTypeInfo = (t, e) => {
+      let i = n.getBCHTypeInfo(r[this.errorCorrectionLevel] << 3 | e);
+      for (let o = 0; o < 15; o++) {
+        let s = !t && (i >> o & 1) === 1;
+        o < 6 ? this.modules[o][8] = s : o < 8 ? this.modules[o + 1][8] = s : this.modules[this.moduleCount - 15 + o][8] = s, o < 8 ? this.modules[8][this.moduleCount - o - 1] = s : o < 9 ? this.modules[8][15 - o - 1 + 1] = s : this.modules[8][15 - o - 1] = s
+      }
+      this.modules[this.moduleCount - 8][8] = !t
+    }, this.createData = (t, e, n) => {
+      let o = [{
+        totalCount: 19,
+        dataCount: 7
+      }];
+      let s = new function() {
+        this.buffer = [], this.length = 0, this.put = (t, e) => {
+          for (let r = 0; r < e; r++) this.putBit((t >>> e - r - 1 & 1) === 1)
+        }, this.putBit = t => {
+          let e = Math.floor(this.length / 8);
+          this.buffer.length <= e && this.buffer.push(0), t && (this.buffer[e] |= 128 >>> this.length % 8), this.length++
+        }
+      };
+      let a = n[0];
+      s.put(a.mode, 4), s.put(a.data.length, (t => {
+        if (t >= 1 && t < 10) return 8
+      })(t)), a.write(s);
+      let h = 0;
+      for (let l = 0; l < o.length; l++) h += o[l].dataCount;
+      if (s.length > 8 * h) throw new Error("code length overflow. (" + s.length + ">" + 8 * h + ")");
+      for (s.length + 4 <= 8 * h && s.put(0, 4); s.length % 8 !== 0;) s.putBit(!1);
+      for (; s.length < 8 * h;)
+        if (s.put(236, 8), s.length >= 8 * h) break;
+        else s.put(17, 8);
+      return s.buffer
+    }
+  }
+
+  return QR;
 })();
 
 // =================================================================================
@@ -260,7 +375,7 @@ async function handleRequest(request) {
           headers: corsHeaders()
         });
       }
-      console.error('Erro inesperado no handleRequest:', error);
+      console.error('Erro inesperado no handleRequest:', error.stack);
       return new Response(JSON.stringify({
         error: `Ocorreu um erro interno: ${error.message}`
       }), {
