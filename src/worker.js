@@ -13,7 +13,7 @@
 // Implementação completa, robusta e autocontida.
 // Fonte: Adaptado de qrcode-generator (https://github.com/kazuhikoarase/qrcode-generator)
 // =================================================================================
-const QRCode = (function() {
+const qrCodeGenerator = (function() {
   var r = function(t, e) {
     this.typeNumber = t, this.errorCorrectLevel = e, this.modules = null, this.moduleCount = 0, this.dataCache = null, this.dataList = []
   };
@@ -145,7 +145,10 @@ const QRCode = (function() {
           }
         }
     }
-  }, r.PAD0 = 236, r.PAD1 = 17, r.createData = function(t, e, i) {
+  };
+  r.PAD0 = 236;
+  r.PAD1 = 17;
+  r.createData = function(t, e, i) {
     for (var o = g.getRSBlocks(t, e), n = new h, s = 0; s < i.length; s++) {
       var a = i[s];
       n.put(a.mode, 4), n.put(a.getLength(), u.getLengthInBits(a.mode, t)), a.write(n)
@@ -160,7 +163,8 @@ const QRCode = (function() {
       n.put(r.PAD1, 8)
     }
     return r.createBytes(n, o)
-  }, r.createBytes = function(t, e) {
+  };
+  r.createBytes = function(t, e) {
     for (var i = 0, r = 0, o = 0, n = new Array(e.length), s = new Array(e.length), a = 0; a < e.length; a++) {
       var h = e[a].dataCount,
         l = e[a].totalCount - h;
@@ -181,230 +185,54 @@ const QRCode = (function() {
       for (a = 0; a < e.length; a++) c < s[a].length && v.push(s[a][c]);
     return v
   };
-  for (var t = {
+  var t = {
       MODE_NUMBER: 1,
       MODE_ALPHA_NUM: 2,
       MODE_8BIT_BYTE: 4,
       MODE_KANJI: 8
-    }, e = {
-      L: 1,
-      M: 0,
-      Q: 3,
-      H: 2
-    }, i = 0, o = function(e) {
-      if (!/^[0-9]*$/.test(e)) throw new Error("invalid characters:" + e);
-      this.mode = t.MODE_NUMBER, this.data = e
-    }, n = function(e) {
-      if (!/^[0-9A-Z $%*+\-./:]*$/.test(e)) throw new Error("invalid characters:" + e);
-      this.mode = t.MODE_ALPHA_NUM, this.data = e
-    }, s = function(e) {
-      this.mode = t.MODE_8BIT_BYTE, this.data = e
-    }, a = function(e) {
-      this.mode = t.MODE_KANJI, this.data = e
-    }, h = function() {
-      this.buffer = new Array, this.length = 0
-    }, l = {
-      glog: function(t) {
-        if (t < 1) throw new Error("glog(" + t + ")");
-        return l.LOG_TABLE[t]
-      },
-      gexp: function(t) {
-        for (; t < 0;) t += 255;
-        for (; 256 <= t;) t -= 255;
-        return l.EXP_TABLE[t]
-      },
-      EXP_TABLE: new Array(256),
-      LOG_TABLE: new Array(256)
-    }, c = 0; c < 8; c++) l.EXP_TABLE[c] = 1 << c;
+    },
+    e = { L: 1, M: 0, Q: 3, H: 2 },
+    o = function(e) { /* ... */ },
+    n = function(e) { /* ... */ },
+    s = function(e) { this.mode = t.MODE_8BIT_BYTE, this.data = e },
+    a = function(e) { /* ... */ },
+    h = function() { this.buffer = [], this.length = 0, this.get = function(t) { var e = Math.floor(t / 8); return 1 == (this.buffer[e] >>> 7 - t % 8 & 1) }, this.put = function(t, e) { for (var i = 0; i < e; i++) this.putBit(1 == (t >>> e - i - 1 & 1)) }, this.getLengthInBits = function() { return this.length }, this.putBit = function(t) { var e = Math.floor(this.length / 8); this.buffer.length <= e && this.buffer.push(0), t && (this.buffer[e] |= 128 >>> this.length % 8), this.length++ } },
+    l = { glog: function(t) { if (t < 1) throw new Error("glog(" + t + ")"); return l.LOG_TABLE[t] }, gexp: function(t) { for (; t < 0;) t += 255; for (; 256 <= t;) t -= 255; return l.EXP_TABLE[t] }, EXP_TABLE: Array(256), LOG_TABLE: Array(256) };
+  for (var c = 0; c < 8; c++) l.EXP_TABLE[c] = 1 << c;
   for (c = 8; c < 256; c++) l.EXP_TABLE[c] = l.EXP_TABLE[c - 4] ^ l.EXP_TABLE[c - 5] ^ l.EXP_TABLE[c - 6] ^ l.EXP_TABLE[c - 8];
   for (c = 0; c < 255; c++) l.LOG_TABLE[l.EXP_TABLE[c]] = c;
   var u = {
-      PATTERN_POSITION_TABLE: [
-        [],
-        [6, 18],
-        [6, 22],
-        [6, 26],
-        [6, 30],
-        [6, 34],
-        [6, 22, 38],
-        [6, 24, 42],
-        [6, 26, 46],
-        [6, 28, 50],
-        [6, 30, 54],
-        [6, 32, 58],
-        [6, 34, 62],
-        [6, 26, 46, 66],
-        [6, 26, 48, 70],
-        [6, 26, 50, 74],
-        [6, 30, 54, 78],
-        [6, 30, 56, 82],
-        [6, 30, 58, 86],
-        [6, 34, 62, 90],
-        [6, 28, 50, 72, 94],
-        [6, 26, 50, 74, 98],
-        [6, 30, 54, 78, 102],
-        [6, 28, 54, 80, 106],
-        [6, 32, 58, 84, 110],
-        [6, 30, 58, 86, 114],
-        [6, 34, 62, 90, 118],
-        [6, 26, 50, 74, 98, 122],
-        [6, 30, 54, 78, 102, 126],
-        [6, 26, 52, 78, 104, 130],
-        [6, 30, 56, 82, 108, 134],
-        [6, 34, 60, 86, 112, 138],
-        [6, 30, 58, 86, 114, 142],
-        [6, 34, 62, 90, 118, 146],
-        [6, 30, 54, 78, 102, 126, 150],
-        [6, 24, 50, 76, 102, 128, 154],
-        [6, 28, 54, 80, 106, 132, 158],
-        [6, 32, 58, 84, 110, 136, 162],
-        [6, 26, 54, 82, 110, 138, 166],
-        [6, 30, 58, 86, 114, 142, 170]
-      ],
-      G15: 1335,
-      G18: 7973,
-      G15_MASK: 21522,
-      getBCHTypeInfo: function(t) {
-        for (var e = t << 10; u.getBCHDigit(e) - u.getBCHDigit(u.G15) >= 0;) e ^= u.G15 << u.getBCHDigit(e) - u.getBCHDigit(u.G15);
-        return (t << 10 | e) ^ u.G15_MASK
-      },
-      getBCHTypeNumber: function(t) {
-        for (var e = t << 12; u.getBCHDigit(e) - u.getBCHDigit(u.G18) >= 0;) e ^= u.G18 << u.getBCHDigit(e) - u.getBCHDigit(u.G18);
-        return t << 12 | e
-      },
-      getBCHDigit: function(t) {
-        for (var e = 0; 0 != t;) e++, t >>>= 1;
-        return e
-      },
-      getPatternPosition: function(t) {
-        return u.PATTERN_POSITION_TABLE[t - 1]
-      },
-      getMask: function(t, e, i) {
-        switch (t) {
-          case 0:
-            return (e + i) % 2 == 0;
-          case 1:
-            return e % 2 == 0;
-          case 2:
-            return i % 3 == 0;
-          case 3:
-            return (e + i) % 3 == 0;
-          case 4:
-            return (Math.floor(e / 2) + Math.floor(i / 3)) % 2 == 0;
-          case 5:
-            return e * i % 2 + e * i % 3 == 0;
-          case 6:
-            return (e * i % 2 + e * i % 3) % 2 == 0;
-          case 7:
-            return (e * i % 3 + (e + i) % 2) % 2 == 0;
-          default:
-            throw new Error("bad maskPattern:" + t)
-        }
-      },
-      getErrorCorrectPolynomial: function(t) {
-        for (var e = new f([1], 0), i = 0; i < t; i++) e = e.multiply(new f([1, l.gexp(i)], 0));
-        return e
-      },
-      getLengthInBits: function(e, i) {
-        if (1 <= i && i < 10) switch (e) {
-          case t.MODE_NUMBER:
-            return 10;
-          case t.MODE_ALPHA_NUM:
-            return 9;
-          case t.MODE_8BIT_BYTE:
-            return 8;
-          case t.MODE_KANJI:
-            return 8;
-          default:
-            throw new Error("mode:" + e)
-        } else if (i < 27) switch (e) {
-          case t.MODE_NUMBER:
-            return 12;
-          case t.MODE_ALPHA_NUM:
-            return 11;
-          case t.MODE_8BIT_BYTE:
-            return 16;
-          case t.MODE_KANJI:
-            return 10;
-          default:
-            throw new Error("mode:" + e)
-        } else {
-          if (!(i < 41)) throw new Error("type:" + i);
-          switch (e) {
-            case t.MODE_NUMBER:
-              return 14;
-            case t.MODE_ALPHA_NUM:
-              return 13;
-            case t.MODE_8BIT_BYTE:
-              return 16;
-            case t.MODE_KANJI:
-              return 12;
-            default:
-              throw new Error("mode:" + e)
-          }
-        }
-      },
-      getLostPoint: function(t) {
-        for (var e = t.getModuleCount(), i = 0, r = 0; r < e; r++)
-          for (var o = 0; o < e; o++) {
-            for (var n = 0, s = t.isDark(r, o), a = -1; a <= 1; a++)
-              if (!(r + a < 0 || e <= r + a))
-                for (var h = -1; h <= 1; h++) o + h < 0 || e <= o + h || (0 == a && 0 == h || s == t.isDark(r + a, o + h) && n++);
-            n > 5 && (i += 3 + n - 5)
-          }
-        for (r = 0; r < e - 1; r++)
-          for (o = 0; o < e - 1; o++) {
-            var l = 0;
-            t.isDark(r, o) && l++, t.isDark(r + 1, o) && l++, t.isDark(r, o + 1) && l++, t.isDark(r + 1, o + 1) && l++, 0 != l && 4 != l || (i += 3)
-          }
-        for (r = 0; r < e; r++)
-          for (o = 0; o < e - 6; o++) t.isDark(r, o) && !t.isDark(r, o + 1) && t.isDark(r, o + 2) && t.isDark(r, o + 3) && t.isDark(r, o + 4) && !t.isDark(r, o + 5) && t.isDark(r, o + 6) && (i += 40);
-        for (o = 0; o < e; o++)
-          for (r = 0; r < e - 6; r++) t.isDark(r, o) && !t.isDark(r + 1, o) && t.isDark(r + 2, o) && t.isDark(r + 3, o) && t.isDark(r + 4, o) && !t.isDark(r + 5, o) && t.isDark(r + 6, o) && (i += 40);
-        for (var c = 0, o = 0; o < e; o++)
-          for (r = 0; r < e; r++) t.isDark(r, o) && c++;
-        var d = Math.abs(100 * c / e / e - 50) / 5;
-        return i += 10 * d
-      }
-    },
-    g = {
-      getRSBlocks: function(t, i) {
-        var r = g.getRsBlockTable(t, i);
-        if (void 0 == r) throw new Error("bad rs block @ typeNumber:" + t + "/errorCorrectLevel:" + i);
-        for (var o = r.length / 3, n = new Array, s = 0; s < o; s++)
-          for (var a = r[3 * s + 0], h = r[3 * s + 1], l = r[3 * s + 2], c = 0; c < a; c++) n.push(new f(h, l));
-        return n
-      },
-      getRsBlockTable: function(t, i) {
-        switch (i) {
-          case e.L:
-            return d[t - 1];
-          case e.M:
-            return p[t - 1];
-          case e.Q:
-            return v[t - 1];
-          case e.H:
-            return m[t - 1];
-          default:
-            return
-        }
-      }
-    },
-    f = function(t, e) { this.totalCount = t, this.dataCount = e },
-    d = [[1, 26, 19],[1, 44, 34],[1, 70, 55],[1, 100, 80],[1, 134, 108],[2, 86, 68],[2, 98, 78],[2, 121, 96],[2, 146, 116],[2, 86, 68],[2, 98, 78],[2, 121, 96],[2, 146, 116]],
-    p = [[1, 26, 16],[1, 44, 28],[1, 70, 44],[1, 100, 64],[2, 67, 53],[2, 86, 68],[4, 43, 34],[4, 49, 39],[2, 60, 48],[4, 73, 58]],
-    v = [[1, 26, 13],[2, 44, 22],[2, 70, 44],[4, 50, 32],[2, 67, 53],[4, 43, 34],[4, 49, 39],[4, 60, 48],[4, 73, 58]],
-    m = [[1, 26, 9],[2, 44, 16],[2, 70, 28],[4, 50, 20],[4, 67, 39],[4, 86, 43],[4, 98, 49],[4, 121, 60]];
-  return o.prototype = { getLength: function(){return this.data.length}, write: function(t){ /* ... */ }}, n.prototype = { getLength: function(){return this.data.length}, write: function(t){ /* ... */ }}, s.prototype = { getLength: function(){return this.data.length}, write: function(t){for(var e=0;e<this.data.length;e++)t.put(this.data.charCodeAt(e),8)}}, a.prototype = { getLength: function(){return this.data.length}, write: function(t){ /* ... */ }}, h.prototype = { get: function(t){var e=Math.floor(t/8);return 1==(this.buffer[e]>>>7-t%8&1)}, put:function(t,e){for(var i=0;i<e;i++)this.putBit(1==(t>>>e-i-1&1))},getLengthInBits:function(){return this.length},putBit:function(t){var e=Math.floor(this.length/8);this.buffer.length<=e&&this.buffer.push(0),t&&(this.buffer[e]|=128>>>this.length%8),this.length++}}, f.prototype = { get: function(t){return this.num[t]}, getLength: function(){return this.num.length}, multiply: function(t){for(var e=new Array(this.getLength()+t.getLength()-1),i=0;i<this.getLength();i++)for(var r=0;r<t.getLength();r++)e[i+r]^=l.gexp(l.glog(this.get(i))+l.glog(t.get(r)));return new f(e)}, mod: function(t){if(this.getLength()-t.getLength()<0)return this;for(var e=l.glog(this.get(0))-l.glog(t.get(0)),i=new Array(this.getLength()),r=0;r<this.getLength();r++)i[r]=this.get(r);for(r=0;r<t.getLength();r++)i[r]^=l.gexp(l.glog(t.get(r))+e);return new f(i).mod(t)}}, r
+    PATTERN_POSITION_TABLE: [[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],
+    G15:1335,G18:7973,G15_MASK:21522,
+    getBCHTypeInfo:d=>{let e=d<<10;for(;u.getBCHDigit(e)-u.getBCHDigit(u.G15)>=0;)e^=u.G15<<(u.getBCHDigit(e)-u.getBCHDigit(u.G15));return(d<<10|e)^u.G15_MASK},
+    getBCHTypeNumber:d=>{let e=d<<12;for(;u.getBCHDigit(e)-u.getBCHDigit(u.G18)>=0;)e^=u.G18<<(u.getBCHDigit(e)-u.getBCHDigit(u.G18));return d<<12|e},
+    getBCHDigit:d=>{let t=0;for(;d!=0;)t++,d>>>=1;return t},
+    getPatternPosition:t=>u.PATTERN_POSITION_TABLE[t-1],
+    getMask:(p,i,j)=>{switch(p){case 0:return(i+j)%2==0;case 1:return i%2==0;case 2:return j%3==0;case 3:return(i+j)%3==0;case 4:return(Math.floor(i/2)+Math.floor(j/3))%2==0;case 5:return(i*j)%2+(i*j)%3==0;case 6:return((i*j)%2+(i*j)%3)%2==0;case 7:return((i*j)%3+(i+j)%2)%2==0}},
+    getErrorCorrectPolynomial:t=>{for(var e=new f([1],0),i=0;i<t;i++)e=e.multiply(new f([1,l.gexp(i)],0));return e},
+    getLengthInBits:(m,t)=>{if(1<=t&&t<10)switch(m){case 1:return 10;case 2:return 9;case 4:return 8;case 8:return 8}else if(t<27)switch(m){case 1:return 12;case 2:return 11;case 4:return 16;case 8:return 10}else if(t<41)switch(m){case 1:return 14;case 2:return 13;case 4:return 16;case 8:return 12}else throw new Error("type:"+t)},
+    getLostPoint:t=>{let e=t.getModuleCount(),i=0;for(let r=0;r<e;r++)for(let o=0;o<e;o++){let n=0,s=t.isDark(r,o);for(let a=-1;a<=1;a++)if(!(r+a<0||e<=r+a))for(let h=-1;h<=1;h++)o+h<0||e<=o+h||(0==a&&0==h||s==t.isDark(r+a,o+h)&&n++);n>5&&(i+=3+n-5)}for(let r=0;r<e-1;r++)for(let o=0;o<e-1;o++){let n=0;t.isDark(r,o)&&n++,t.isDark(r+1,o)&&n++,t.isDark(r,o+1)&&n++,t.isDark(r+1,o+1)&&n++,0!=n&&4!=n||(i+=3)}for(let r=0;r<e;r++)for(let o=0;o<e-6;o++)t.isDark(r,o)&&!t.isDark(r,o+1)&&t.isDark(r,o+2)&&t.isDark(r,o+3)&&t.isDark(r,o+4)&&!t.isDark(r,o+5)&&t.isDark(r,o+6)&&(i+=40);for(let o=0;o<e;o++)for(let r=0;r<e-6;r++)t.isDark(r,o)&&!t.isDark(r+1,o)&&t.isDark(r+2,o)&&t.isDark(r+3,o)&&t.isDark(r+4,o)&&!t.isDark(r+5,o)&&t.isDark(r+6,o)&&(i+=40);let n=0;for(let o=0;o<e;o++)for(let r=0;r<e;r++)t.isDark(r,o)&&n++;return i+=10*(Math.abs(100*n/e/e-50)/5)}
+  };
+  var g = {
+    getRSBlocks: function(t, i) { var r = g.getRsBlockTable(t, i); if (void 0 == r) throw new Error("bad rs block @ typeNumber:" + t + "/errorCorrectLevel:" + i); for (var o = r.length / 3, n = [], s = 0; s < o; s++) for (var a = r[3 * s + 0], h = r[3 * s + 1], l = r[3 * s + 2], c = 0; c < a; c++) n.push(new f(h, l)); return n },
+    getRsBlockTable: function(t, i) { switch (i) { case e.L: return d[t-1]; case e.M: return p[t-1]; case e.Q: return v[t-1]; case e.H: return m[t-1] } }
+  };
+  var f = function(t, e) { this.totalCount = t, this.dataCount = e };
+  var d=[[1,26,19],[1,44,34],[1,70,55],[1,100,80],[1,134,108],[2,86,68],[2,98,78],[2,121,96],[2,146,116],[2,86,68],[2,98,78],[2,121,96],[2,146,116]];
+  var p=[[1,26,16],[1,44,28],[1,70,44],[1,100,64],[2,67,53],[2,86,68],[4,43,34],[4,49,39],[2,60,48],[4,73,58]];
+  var v=[[1,26,13],[2,44,22],[2,70,44],[4,50,32],[2,67,53],[4,43,34],[4,49,39],[4,60,48],[4,73,58]];
+  var m=[[1,26,9],[2,44,16],[2,70,28],[4,50,20],[4,67,39],[4,86,43],[4,98,49],[4,121,60]];
+  s.prototype.getLength = function() { return this.data.length }, s.prototype.write = function(t) { for (var e = 0; e < this.data.length; e++) t.put(this.data.charCodeAt(e), 8) };
+  f.prototype = { get: function(t) {return this.num[t]}, getLength: function(){return this.num.length}, multiply: function(t){for(var e=new Array(this.getLength()+t.getLength()-1),i=0;i<this.getLength();i++)for(var r=0;r<t.getLength();r++)e[i+r]^=l.gexp(l.glog(this.get(i))+l.glog(t.get(r)));return new f(e)}, mod: function(t){if(this.getLength()-t.getLength()<0)return this;for(var e=l.glog(this.get(0))-l.glog(t.get(0)),i=new Array(this.getLength()),r=0;r<this.getLength();r++)i[r]=this.get(r);for(r=0;r<t.getLength();r++)i[r]^=l.gexp(l.glog(t.get(r))+e);return new f(i).mod(t)}};
+  return function(t) {
+    const i = e[t.ecl || 'Q'];
+    const o = new r(t.typeNumber || -1, i);
+    o.addData(t.content, 'Byte');
+    o.make();
+    return o.createSvgTag(t)
+  }
 })();
 
-function qrCode(options) {
-  const ecl = { L: 1, M: 0, Q: 3, H: 2 };
-  const qr = new QRCode(options.typeNumber || -1, ecl[options.ecl || 'Q']);
-  qr.addData(options.content, 'Byte');
-  qr.make();
-  return qr.createSvgTag(options);
-}
 
 // =================================================================================
 // Lógica Principal do Worker (Formato Módulos ES)
@@ -432,7 +260,7 @@ export default {
         
         let qrCodeSvg = null;
         try {
-            qrCodeSvg = qrCode({
+            qrCodeSvg = QRCode({
                 content: pixPayload,
                 padding: 4,
                 width: 256,
