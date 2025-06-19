@@ -1,5 +1,3 @@
-// Primeira versão alpha
-
 {
   "name": "pix-code-api",
   "compatibility_date": "2025-04-16",
@@ -14,5 +12,8 @@
     "logs": {
       "enabled": true
     }
+  },
+  "browser": {
+    "binding": "RENDER_HTML"
   }
 }
