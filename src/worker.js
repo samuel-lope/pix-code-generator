@@ -2,7 +2,7 @@
  * Cloudflare Worker para gerar um payload de PIX Copia e Cola (BR Code) e o código SVG do QR Code.
  *
  * Esta versão definitiva utiliza uma implementação completa e robusta do gerador de QRCode
- * para garantir a correta geração do SVG no ambiente Cloudflare Workers.
+ * e inclui logs de depuração para garantir a correta geração do SVG.
  *
  * Endpoint: /pix/code/generator
  * Método: POST
@@ -10,9 +10,10 @@
 
 // =================================================================================
 // Módulo de Geração de QR Code (qrcode.js)
-// Implementação completa, robusta e autocontida, inspirada em bibliotecas consolidadas.
+// Implementação completa, robusta e autocontida.
+// Fonte: Adaptado de qrcode-generator (https://github.com/kazuhikoarase/qrcode-generator)
 // =================================================================================
-const QRCode = (function() {
+const qrCodeGenerator = (function() {
   var r = function(t, e) {
     this.typeNumber = t, this.errorCorrectLevel = e, this.modules = null, this.moduleCount = 0, this.dataCache = null, this.dataList = []
   };
@@ -220,11 +221,16 @@ const QRCode = (function() {
   f.prototype = { get: function(t) {return this.num[t]}, getLength: function(){return this.num.length}, multiply: function(t){for(var e=new Array(this.getLength()+t.getLength()-1),i=0;i<this.getLength();i++)for(var r=0;r<t.getLength();r++)e[i+r]^=l.gexp(l.glog(this.get(i))+l.glog(t.get(r)));return new f(e)}, mod: function(t){if(this.getLength()-t.getLength()<0)return this;for(var e=l.glog(this.get(0))-l.glog(t.get(0)),i=new Array(this.getLength()),r=0;r<this.getLength();r++)i[r]=this.get(r);for(r=0;r<t.getLength();r++)i[r]^=l.gexp(l.glog(t.get(r))+e);return new f(i).mod(t)}};
   
   return function(t) {
+    console.log("QRCode Lib: Recebendo opções:", JSON.stringify(t));
     const i = e[t.ecl || 'Q'];
     const o = new r(t.typeNumber || -1, i);
     o.addData(t.content, 'Byte');
+    console.log("QRCode Lib: Dados adicionados. Executando make()...");
     o.make();
-    return o.createSvgTag(t)
+    console.log("QRCode Lib: make() concluído. Gerando SVG...");
+    const svg = o.createSvgTag(t);
+    console.log("QRCode Lib: SVG gerado com sucesso.");
+    return svg;
   }
 })();
 
@@ -252,10 +258,11 @@ export default {
         }
 
         const pixPayload = generatePixPayload(data);
+        console.log("Worker: Payload PIX gerado:", pixPayload);
         
         let qrCodeSvg = null;
         try {
-            qrCodeSvg = QRCode({
+            qrCodeSvg = qrCodeGenerator({
                 content: pixPayload,
                 padding: 4,
                 width: 256,
@@ -263,13 +270,17 @@ export default {
                 ecl: 'Q'
             });
         } catch (e) {
-            console.error("Falha na geração do QRCode:", e.message, e.stack);
+            console.error("Worker: Falha CRÍTICA na geração do QRCode:", e.message, e.stack);
         }
         
-        return new Response(JSON.stringify({
+        const responsePayload = {
           pixCopiaECola: pixPayload,
           qrCodeSvg: qrCodeSvg
-        }), { status: 200, headers: corsHeaders() });
+        };
+
+        console.log("Worker: Payload de resposta final:", JSON.stringify(responsePayload).substring(0, 300) + "...");
+
+        return new Response(JSON.stringify(responsePayload), { status: 200, headers: corsHeaders() });
 
       } catch (error) {
         if (error instanceof SyntaxError) {
