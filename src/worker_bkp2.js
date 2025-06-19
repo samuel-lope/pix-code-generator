@@ -1,93 +1,8 @@
-/**
- * Cloudflare Worker – Geração de PIX + QR Code SVG Base64 de alta qualidade
- */
+// ==============================
+// Começo do código do QRCode Generator (copie da CDN ou NPM dist)
+// Conteúdo de: https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js
+// ==============================
 
-addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request));
-});
-
-async function handleRequest(request) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders() });
-  }
-  if (request.method !== 'POST' || new URL(request.url).pathname !== '/pix/code/generator') {
-    return new Response(JSON.stringify({ error: 'Endpoint não encontrado.' }), { status: 404, headers: corsHeaders() });
-  }
-
-  try {
-    const data = await request.json();
-    ['pixKey', 'merchantName', 'merchantCity'].forEach(f => {
-      if (!data[f]) throw new Error(`Campo '${f}' obrigatório.`);
-    });
-
-    const pixPayload = generatePixPayload(data);
-
-    // Gera SVG com correção Q ou H e tamanho customizável (cellSize = 4)
-    const qr = qrcode(0, data.qrECL === 'H' ? 'H' : 'Q');
-    qr.addData(pixPayload);
-    qr.make();
-    const svg = qr.createSvgTag({ cellSize: data.qrCellSize || 4, margin: data.qrMargin || 4 });
-    const base64 = btoa(unescape(encodeURIComponent(svg)));
-
-    return new Response(JSON.stringify({
-      pixCopiaECola: pixPayload,
-      svgQrCode: `data:image/svg+xml;base64,${base64}`
-    }), { status: 200, headers: corsHeaders() });
-
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders() });
-  }
-}
-
-function corsHeaders() {
-  return {
-    'Content-Type': 'application/json;charset=UTF-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-}
-
-// Geração do payload PIX Copia e Cola
-function formatField(id, v) {
-  return id + v.length.toString().padStart(2,'0') + v;
-}
-function calculateCRC16(str) {
-  let crc = 0xFFFF;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
-      crc &= 0xFFFF;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4,'0');
-}
-function generatePixPayload({ pixKey, description = '', merchantName, merchantCity, txid = '***', amount }) {
-  if (merchantName.length > 25) throw new Error('merchantName > 25 caracteres');
-  if (merchantCity.length > 15) throw new Error('merchantCity > 15 caracteres');
-  if (txid !== '***' && !/^[a-zA-Z0-9]{1,25}$/.test(txid)) throw new Error('txid inválido');
-
-  const gui = formatField('00','br.gov.bcb.pix');
-  const key = formatField('01', pixKey);
-  const desc = description ? formatField('02', description) : '';
-  const mai = formatField('26', gui + key + desc);
-  const mcc = '52040000';
-  const cur = '5303986';
-  const amt = amount ? formatField('54', parseFloat(amount).toFixed(2)) : '';
-  const ctry = '5802BR';
-  const mname = formatField('59', merchantName);
-  const mcity = formatField('60', merchantCity);
-  const txidField = formatField('05', txid);
-  const add = formatField('62', txidField);
-
-  const raw = ['00','01', mai, mcc, cur, amt, ctry, mname, mcity, add, '6304'].join('');
-  return raw + calculateCRC16(raw);
-}
-
-// =======================
-// Biblioteca qrcode-generator (ver. completa em JS puro)
-// =======================
 //---------------------------------------------------------------------
 //
 // QR Code Generator for JavaScript
@@ -2385,4 +2300,79 @@ var qrcode = function() {
 }(function () {
     return qrcode;
 }));
+
+// ==============================
+// Fim do código do QRCode Generator
+// ==============================
+
+// Agora o seu código principal vem aqui
+export default {
+  async fetch(request, env, ctx) {
+    if (request.method !== 'POST') {
+      return new Response('Only POST allowed', { status: 405 });
+    }
+
+    const data = await request.json();
+
+    const payload = buildPixPayload(data);
+    const svg = generateSvgQr(payload);
+
+    return new Response(JSON.stringify({
+      pixCopiaECola: payload,
+      svgQrCode: `data:image/svg+xml;base64,${btoa(svg)}`
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+};
+
+function buildPixPayload({ pixKey, description, merchantName, merchantCity, amount, txid }) {
+  function formatSegment(id, value) {
+    const length = value.length.toString().padStart(2, '0');
+    return id + length + value;
+  }
+
+  const gui = formatSegment('00', 'BR.GOV.BCB.PIX');
+  const key = formatSegment('01', pixKey);
+  const desc = description ? formatSegment('02', description) : '';
+
+  const merchantAccountInfo = formatSegment('26', gui + key + desc);
+  const merchantCategoryCode = '52040000';
+  const currency = '5303986';
+  const transactionAmount = amount ? formatSegment('54', amount) : '';
+  const countryCode = '5802BR';
+  const name = formatSegment('59', merchantName);
+  const city = formatSegment('60', merchantCity);
+  const txidField = txid ? formatSegment('05', txid) : '';
+  const additionalData = formatSegment('62', txidField);
+
+  let payload = '000201' + merchantAccountInfo + merchantCategoryCode + currency + transactionAmount + countryCode + name + city + additionalData;
+  payload += '6304';
+
+  const crc = crc16(payload);
+  return payload + crc;
+}
+
+function crc16(str) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function generateSvgQr(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createSvgTag({ scalable: true });
+}
 
