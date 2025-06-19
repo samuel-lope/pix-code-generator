@@ -2,88 +2,141 @@
  * Cloudflare Worker – Geração de PIX + QR Code SVG Base64 de alta qualidade
  */
 
-addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request));
-});
+export default {
+  async fetch(request, env, ctx) {
+    if (request.method === 'OPTIONS') return handleOptions(request);
 
-async function handleRequest(request) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders() });
-  }
-  if (request.method !== 'POST' || new URL(request.url).pathname !== '/pix/code/generator') {
+    const { pathname } = new URL(request.url);
+
+    if (pathname === '/pix/code/generator' && request.method === 'POST') {
+      try {
+        const data = await request.json();
+
+        const requiredFields = ['pixKey', 'merchantName', 'merchantCity'];
+        for (const field of requiredFields) {
+          if (!data[field]) {
+            return new Response(JSON.stringify({
+              error: `O campo '${field}' é obrigatório.`
+            }), { status: 400, headers: corsHeaders() });
+          }
+        }
+
+        const pixPayload = generatePixPayload(data);
+
+        // --- Geração do QR Code SVG com qualidade ajustável ---
+        const level = (data.qrECL === 'H') ? 'H' : 'Q';
+        const cellSize = data.qrCellSize || 4;
+        const margin = data.qrMargin || 4;
+
+        const qr = qrcode(0, level);
+        qr.addData(pixPayload);
+        qr.make();
+        const svg = qr.createSvgTag({ cellSize: cellSize, margin: margin });
+        const base64Svg = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+
+        return new Response(JSON.stringify({
+          pixCopiaECola: pixPayload,
+          svgQrCode: base64Svg
+        }), { status: 200, headers: corsHeaders() });
+
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return new Response(JSON.stringify({ error: 'Corpo da requisição não é um JSON válido.' }), { status: 400, headers: corsHeaders() });
+        }
+        console.error('Erro interno:', error.stack);
+        return new Response(JSON.stringify({ error: `Erro interno: ${error.message}` }), { status: 500, headers: corsHeaders() });
+      }
+    }
+
     return new Response(JSON.stringify({ error: 'Endpoint não encontrado.' }), { status: 404, headers: corsHeaders() });
   }
+};
 
-  try {
-    const data = await request.json();
-    ['pixKey', 'merchantName', 'merchantCity'].forEach(f => {
-      if (!data[f]) throw new Error(`Campo '${f}' obrigatório.`);
+// --- Suporte a CORS ---
+function handleOptions(request) {
+  const headers = request.headers;
+  if (
+    headers.get("Origin") !== null &&
+    headers.get("Access-Control-Request-Method") !== null &&
+    headers.get("Access-Control-Request-Headers") !== null
+  ) {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      }
     });
-
-    const pixPayload = generatePixPayload(data);
-
-    // Gera SVG com correção Q ou H e tamanho customizável (cellSize = 4)
-    const qr = qrcode(0, data.qrECL === 'H' ? 'H' : 'Q');
-    qr.addData(pixPayload);
-    qr.make();
-    const svg = qr.createSvgTag({ cellSize: data.qrCellSize || 4, margin: data.qrMargin || 4 });
-    const base64 = btoa(unescape(encodeURIComponent(svg)));
-
-    return new Response(JSON.stringify({
-      pixCopiaECola: pixPayload,
-      svgQrCode: `data:image/svg+xml;base64,${base64}`
-    }), { status: 200, headers: corsHeaders() });
-
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders() });
+  } else {
+    return new Response(null, { headers: { "Allow": "POST, OPTIONS" } });
   }
 }
 
 function corsHeaders() {
   return {
-    'Content-Type': 'application/json;charset=UTF-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
   };
 }
 
-// Geração do payload PIX Copia e Cola
-function formatField(id, v) {
-  return id + v.length.toString().padStart(2,'0') + v;
+// --- Funções PIX Copia e Cola (100% conforme o seu código funcional) ---
+function formatField(id, value) {
+  const length = value.length.toString().padStart(2, '0');
+  return `${id}${length}${value}`;
 }
-function calculateCRC16(str) {
+
+function calculateCRC16(payload) {
   let crc = 0xFFFF;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
+  const polynomial = 0x1021;
+  for (let i = 0; i < payload.length; i++) {
+    const byte = payload.charCodeAt(i);
+    crc ^= (byte << 8);
     for (let j = 0; j < 8; j++) {
-      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
-      crc &= 0xFFFF;
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ polynomial);
+      } else {
+        crc <<= 1;
+      }
     }
   }
-  return crc.toString(16).toUpperCase().padStart(4,'0');
+  return ('0000' + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
 }
-function generatePixPayload({ pixKey, description = '', merchantName, merchantCity, txid = '***', amount }) {
-  if (merchantName.length > 25) throw new Error('merchantName > 25 caracteres');
-  if (merchantCity.length > 15) throw new Error('merchantCity > 15 caracteres');
-  if (txid !== '***' && !/^[a-zA-Z0-9]{1,25}$/.test(txid)) throw new Error('txid inválido');
 
-  const gui = formatField('00','br.gov.bcb.pix');
+function generatePixPayload(data) {
+  const { pixKey, description, merchantName, merchantCity, txid = '***', amount } = data;
+
+  if (merchantName.length > 25) throw new Error("O nome do comerciante (merchantName) não pode exceder 25 caracteres.");
+  if (merchantCity.length > 15) throw new Error("A cidade do comerciante (merchantCity) não pode exceder 15 caracteres.");
+  if (txid && txid !== '***' && !/^[a-zA-Z0-9]{1,25}$/.test(txid)) throw new Error("O txid deve conter apenas letras e números e ter no máximo 25 caracteres.");
+  if (description) {
+    const maxDescLength = 99 - 4 - 14 - (4 + pixKey.length) - 4;
+    if (description.length > maxDescLength) {
+      throw new Error(`A descrição é muito longa para a chave PIX fornecida. Máximo de ${maxDescLength} caracteres.`);
+    }
+  }
+
+  const gui = formatField('00', 'BR.GOV.BCB.PIX');
   const key = formatField('01', pixKey);
   const desc = description ? formatField('02', description) : '';
-  const mai = formatField('26', gui + key + desc);
-  const mcc = '52040000';
-  const cur = '5303986';
-  const amt = amount ? formatField('54', parseFloat(amount).toFixed(2)) : '';
-  const ctry = '5802BR';
-  const mname = formatField('59', merchantName);
-  const mcity = formatField('60', merchantCity);
-  const txidField = formatField('05', txid);
-  const add = formatField('62', txidField);
+  const merchantAccountInfo = formatField('26', `${gui}${key}${desc}`);
+  const merchantCategoryCode = formatField('52', '0000');
+  const transactionCurrency = formatField('53', '986');
+  const formattedAmount = amount ? formatField('54', parseFloat(amount).toFixed(2)) : '';
+  const countryCode = formatField('58', 'BR');
+  const merchantNameFormatted = formatField('59', merchantName);
+  const merchantCityFormatted = formatField('60', merchantCity);
+  const additionalDataField = formatField('62', formatField('05', txid));
 
-  const raw = ['00','01', mai, mcc, cur, amt, ctry, mname, mcity, add, '6304'].join('');
-  return raw + calculateCRC16(raw);
+  let payload = `${formatField('00','01')}${merchantAccountInfo}${merchantCategoryCode}${transactionCurrency}${formattedAmount}${countryCode}${merchantNameFormatted}${merchantCityFormatted}${additionalDataField}`;
+
+  const payloadWithCrcId = `${payload}6304`;
+  const crc = calculateCRC16(payloadWithCrcId);
+
+  return `${payload}6304${crc}`;
 }
+
 
 // =======================
 // Biblioteca qrcode-generator (ver. completa em JS puro)
