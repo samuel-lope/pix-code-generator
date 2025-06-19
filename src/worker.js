@@ -10,7 +10,7 @@
 
 // =================================================================================
 // Módulo de Geração de QR Code (autocontido e confiável)
-// Fonte: Lógica adaptada de implementações robustas de qrcode-generator.
+// Fonte: Implementação completa baseada em qrcode-generator (https://github.com/kazuhikoarase/qrcode-generator)
 // =================================================================================
 const qrCodeGenerator = (function() {
   var r = function(t, e) {
@@ -171,25 +171,26 @@ const qrCodeGenerator = (function() {
       for (var c = 0; c < n[a].length; c++) n[a][c] = 255 & t.buffer[c + i];
       i += h;
       var d = u.getErrorCorrectPolynomial(l),
-        p = new f(n[a], d.getLength() - 1).mod(d);
+        p = new f(n[a], d.getLength() - 1),
+        m = p.mod(d);
       s[a] = new Array(d.getLength() - 1);
       for (c = 0; c < s[a].length; c++) {
-        var g = c + p.getLength() - s[a].length;
-        s[a][c] = 0 <= g ? p.get(g) : 0
+        var v = c + m.getLength() - s[a].length;
+        s[a][c] = 0 <= v ? m.get(v) : 0
       }
     }
-    for (var v = new Array, c = 0; c < r; c++)
-      for (a = 0; a < e.length; a++) c < n[a].length && v.push(n[a][c]);
+    for (var w = new Array, c = 0; c < r; c++)
+      for (a = 0; a < e.length; a++) c < n[a].length && w.push(n[a][c]);
     for (c = 0; c < o; c++)
-      for (a = 0; a < e.length; a++) c < s[a].length && v.push(s[a][c]);
-    return v
+      for (a = 0; a < e.length; a++) c < s[a].length && w.push(s[a][c]);
+    return w
   };
   var t = { MODE_NUMBER: 1, MODE_ALPHA_NUM: 2, MODE_8BIT_BYTE: 4, MODE_KANJI: 8 },
     e = { L: 1, M: 0, Q: 3, H: 2 },
-    o = function(e) { /* ... */ },
-    n = function(e) { /* ... */ },
+    o = function(e) { this.mode = t.MODE_NUMBER, this.data = e },
+    n = function(e) { this.mode = t.MODE_ALPHA_NUM, this.data = e },
     s = function(e) { this.mode = t.MODE_8BIT_BYTE, this.data = e },
-    a = function(e) { /* ... */ },
+    a = function(e) { this.mode = t.MODE_KANJI, this.data = e },
     h = function() { this.buffer = [], this.length = 0, this.get = function(t) { var e = Math.floor(t / 8); return 1 == (this.buffer[e] >>> 7 - t % 8 & 1) }, this.put = function(t, e) { for (var i = 0; i < e; i++) this.putBit(1 == (t >>> e - i - 1 & 1)) }, this.getLengthInBits = function() { return this.length }, this.putBit = function(t) { var e = Math.floor(this.length / 8); this.buffer.length <= e && this.buffer.push(0), t && (this.buffer[e] |= 128 >>> this.length % 8), this.length++ } },
     l = { glog: function(t) { if (t < 1) throw new Error("glog(" + t + ")"); return l.LOG_TABLE[t] }, gexp: function(t) { for (; t < 0;) t += 255; for (; 256 <= t;) t -= 255; return l.EXP_TABLE[t] }, EXP_TABLE: Array(256), LOG_TABLE: Array(256) };
   for (var c = 0; c < 8; c++) l.EXP_TABLE[c] = 1 << c;
