@@ -12,8 +12,5 @@
     "logs": {
       "enabled": true
     }
-  },
-  "browser": {
-    "binding": "RENDER_HTML"
   }
 }

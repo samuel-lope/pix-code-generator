@@ -1,4 +1,4 @@
-# pix-code-generator
+# PIX-code-generator 0.0.2 beta
 Código para criar código PIX (copia e cola) usando Workers da Cloudflare.
 
 Endpoint POST para gerar QrCode: https://api.sl.app.br/pix/code/generator
@@ -6,25 +6,31 @@ Endpoint POST para gerar QrCode: https://api.sl.app.br/pix/code/generator
 Exemplo de payload JSON enviado:
 ```json
 {
-  "pixKey": "pix.efi@sa.arq.br",
-  "merchantName": "SAMUELLOPES",
-  "merchantCity": "NOVOGAMA",
-  "amount": "0.00",
-  "txid": "TXIDUNICO123",
-  "description": "opcional"
+  "pixKey": "eee344f8cbde4f7f@sa.arq.br",
+  "description": "PAGAMENTO AVULSO",
+  "merchantName": "SAMUEL LOPES",
+  "merchantCity": "NOVO GAMA",
+  "amount": "1.00",
+  "txid": "c2cddaTXID",
+  "qrECL": "Q",
+  "qrCellSize": 8,
+  "qrMargin": 2
 }
 ```
 Exemplo cURL:
 ```
-curl --location 'https://api.sl.app.br/pix/code/generator' \
+curl --location 'api.sl.app.br/pix/code/generator' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "pixKey": "pix.efi@sa.arq.br",
-  "merchantName": "SAMUELLOPES",
-  "merchantCity": "NOVOGAMA",
-  "amount": "0.00",
-  "txid": "TXIDUNICO123",
-  "description": ""
-}
-'
+  "pixKey": "eee344f8cbde4f7f@sa.arq.br",
+  "description": "PAGAMENTO AVULSO",
+  "merchantName": "SAMUEL LOPES",
+  "merchantCity": "NOVO GAMA",
+  "amount": "1.00",
+  "txid": "c2cddaTXID",
+  "qrECL": "Q",
+  "qrCellSize": 8,
+  "qrMargin": 2
+}'
+
 ```
