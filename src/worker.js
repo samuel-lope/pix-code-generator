@@ -3,6 +3,7 @@
  *
  * Esta versão definitiva utiliza uma implementação completa e robusta do gerador de QRCode,
  * autocontida no script para garantir a compatibilidade total com o ambiente Cloudflare Workers.
+ * A correção final na classe de polinômios foi fornecida pelo usuário.
  *
  * Endpoint: /pix/code/generator
  * Método: POST
@@ -212,7 +213,15 @@ const qrCodeGenerator = (function() {
     getRSBlocks: function(t, i) { var r = g.getRsBlockTable(t, i); if (void 0 == r) throw new Error("bad rs block @ typeNumber:" + t + "/errorCorrectLevel:" + i); for (var o = r.length / 3, n = [], s = 0; s < o; s++) for (var a = r[3 * s + 0], h = r[3 * s + 1], l = r[3 * s + 2], c = 0; c < a; c++) n.push(new f(h, l)); return n },
     getRsBlockTable: function(t, i) { switch (i) { case e.L: return d[t-1]; case e.M: return p[t-1]; case e.Q: return v[t-1]; case e.H: return m[t-1] } }
   };
-  var f = function(t, e) { this.totalCount = t, this.dataCount = e };
+  // *** CORREÇÃO APLICADA AQUI ***
+  var f = function(t, e) {
+    if (Array.isArray(t)) {
+      this.num = t;
+    } else {
+      this.totalCount = t;
+      this.dataCount = e;
+    }
+  };
   var d=[[1,26,19],[1,44,34],[1,70,55],[1,100,80],[1,134,108],[2,86,68],[2,98,78],[2,121,96],[2,146,116],[2,86,68],[2,98,78],[2,121,96],[2,146,116]];
   var p=[[1,26,16],[1,44,28],[1,70,44],[1,100,64],[2,67,53],[2,86,68],[4,43,34],[4,49,39],[2,60,48],[4,73,58]];
   var v=[[1,26,13],[2,44,22],[2,70,44],[4,50,32],[2,67,53],[4,43,34],[4,49,39],[4,60,48],[4,73,58]];
