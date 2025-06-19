@@ -1,5 +1,7 @@
 /**
- * Cloudflare Worker – Geração de PIX + QR Code SVG Base64 de alta qualidade
+ * Cloudflare Worker – Geração de PIX + QR Code SVG Base64 de Alta Qualidade
+ * Samuel Lopes 19-06-2025 IG:@samuellopes X:@samlopes
+ * version: 0.0.2 - beta
  */
 
 export default {
@@ -139,7 +141,7 @@ function generatePixPayload(data) {
 
 
 // =======================
-// Biblioteca qrcode-generator (ver. completa em JS puro)
+// Biblioteca qrcode-generator (versao completa em JS puro)
 // =======================
 //---------------------------------------------------------------------
 //

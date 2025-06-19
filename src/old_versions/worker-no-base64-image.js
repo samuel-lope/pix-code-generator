@@ -2,7 +2,7 @@
  * Cloudflare Worker para gerar um payload de PIX Copia e Cola (BR Code).
  *
  * Esta versão foca apenas na geração da string "Copia e Cola",
- * removendo a lógica de geração de QR Code para estabilidade.
+ * Sem a lógica de geração de QR Code para estabilidade.
  *
  * Endpoint: /pix/code/generator
  * Método: POST

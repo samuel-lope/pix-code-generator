@@ -1,5 +1,5 @@
 // ==============================
-// Começo do código do QRCode Generator (copie da CDN ou NPM dist)
+// Começo do código do QRCode Generator (copiado da CDN ou NPM dist)
 // Conteúdo de: https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js
 // ==============================
 
