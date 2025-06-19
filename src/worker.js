@@ -222,12 +222,12 @@ const qrCodeGenerator = (function() {
       this.dataCount = e;
     }
   };
+  f.prototype = { get: function(t) {return this.num[t]}, getLength: function(){return this.num.length}, multiply: function(t){for(var e=new Array(this.getLength()+t.getLength()-1),i=0;i<this.getLength();i++)for(var r=0;r<t.getLength();r++)e[i+r]^=l.gexp(l.glog(this.get(i))+l.glog(t.get(r)));return new f(e)}, mod: function(t){if(this.getLength()-t.getLength()<0)return this;for(var e=l.glog(this.get(0))-l.glog(t.get(0)),i=new Array(this.getLength()),r=0;r<this.getLength();r++)i[r]=this.get(r);for(r=0;r<t.getLength();r++)i[r]^=l.gexp(l.glog(t.get(r))+e);return new f(i).mod(t)}};
   var d=[[1,26,19],[1,44,34],[1,70,55],[1,100,80],[1,134,108],[2,86,68],[2,98,78],[2,121,96],[2,146,116],[2,86,68],[2,98,78],[2,121,96],[2,146,116]];
   var p=[[1,26,16],[1,44,28],[1,70,44],[1,100,64],[2,67,53],[2,86,68],[4,43,34],[4,49,39],[2,60,48],[4,73,58]];
   var v=[[1,26,13],[2,44,22],[2,70,44],[4,50,32],[2,67,53],[4,43,34],[4,49,39],[4,60,48],[4,73,58]];
   var m=[[1,26,9],[2,44,16],[2,70,28],[4,50,20],[4,67,39],[4,86,43],[4,98,49],[4,121,60]];
   s.prototype.getLength = function() { return this.data.length }, s.prototype.write = function(t) { for (var e = 0; e < this.data.length; e++) t.put(this.data.charCodeAt(e), 8) };
-  f.prototype = { get: function(t) {return this.num[t]}, getLength: function(){return this.num.length}, multiply: function(t){for(var e=new Array(this.getLength()+t.getLength()-1),i=0;i<this.getLength();i++)for(var r=0;r<t.getLength();r++)e[i+r]^=l.gexp(l.glog(this.get(i))+l.glog(t.get(r)));return new f(e)}, mod: function(t){if(this.getLength()-t.getLength()<0)return this;for(var e=l.glog(this.get(0))-l.glog(t.get(0)),i=new Array(this.getLength()),r=0;r<this.getLength();r++)i[r]=this.get(r);for(r=0;r<t.getLength();r++)i[r]^=l.gexp(l.glog(t.get(r))+e);return new f(i).mod(t)}};
   
   return function(t) {
     const i = e[t.ecl || 'Q'];
