@@ -142,10 +142,11 @@ function generatePixPayload(data) {
 }
 
 
-// =======================
+// ==========================================================================
 // Biblioteca qrcode-generator (versao completa em JS puro)
-// =======================
-//---------------------------------------------------------------------
+// Começo do código do QRCode Generator (copiado da CDN ou NPM dist)
+// Conteúdo de: https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js
+// ==========================================================================
 //
 // QR Code Generator for JavaScript
 //
@@ -154,11 +155,11 @@ function generatePixPayload(data) {
 // URL: http://www.d-project.com/
 //
 // Licensed under the MIT license:
-//  http://www.opensource.org/licenses/mit-license.php
+// http://www.opensource.org/licenses/mit-license.php
 //
 // The word 'QR Code' is registered trademark of
 // DENSO WAVE INCORPORATED
-//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+// http://www.denso-wave.com/qrcode/faqpatent-e.html
 //
 //---------------------------------------------------------------------
 
