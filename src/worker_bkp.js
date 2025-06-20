@@ -34,9 +34,7 @@ export default {
         qr.addData(pixPayload);
         qr.make();
         const svg = qr.createSvgTag({ cellSize: cellSize, margin: margin });
-        const base64Svg = `data:image/svg+xml;base64,${typeof Buffer !== 'undefined'
-          ? Buffer.from(svg, 'utf-8').toString('base64')
-          : btoa(String.fromCharCode(...new Uint8Array(new TextEncoder().encode(svg))))}`;
+        const base64Svg = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 
         return new Response(JSON.stringify({
           pixCopiaECola: pixPayload,
@@ -2442,15 +2440,4 @@ var qrcode = function() {
 }(function () {
     return qrcode;
 }));
-
-// Unicode-safe base64 encoding for Cloudflare Workers
-function base64EncodeUnicode(str) {
-  // TextEncoder is available in Workers and modern browsers
-  const uint8array = new TextEncoder().encode(str);
-  let binary = '';
-  for (let i = 0; i < uint8array.length; i++) {
-    binary += String.fromCharCode(uint8array[i]);
-  }
-  return btoa(binary);
-}
 
