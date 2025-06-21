@@ -1,4 +1,4 @@
-# PIX-code-generator 0.0.2 beta
+# API PIX-code-generator 0.0.2 beta
 Código para criar código PIX (copia e cola) usando Workers da Cloudflare.
 
 Endpoint POST para gerar QrCode: https://api.sl.app.br/v2/pix
