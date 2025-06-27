@@ -9,7 +9,7 @@
     },
     {
       "pattern": "api.samuellopes.com.br/pix/*",
-      "custom_domain": true
+      "zone_name": "samuellopes.com.br"
     }
   ],
   "observability": {
