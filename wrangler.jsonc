@@ -8,7 +8,7 @@
       "custom_domain": true
     },
     {
-      "pattern": "api.samuellopes.com.br/pix/*",
+      "pattern": "api.samuellopes.com.br/*",
       "zone_name": "samuellopes.com.br"
     }
   ],
