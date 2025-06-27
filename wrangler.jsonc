@@ -6,6 +6,10 @@
     {
       "pattern": "api.sl.app.br",
       "custom_domain": true
+    },
+    {
+      "pattern": "api.samuellopes.com.br/pix/*",
+      "custom_domain": true
     }
   ],
   "observability": {
