@@ -4,8 +4,8 @@
   "main": "src/worker.js",
   "routes": [
     {
-      "pattern": "api.sl.app.br",
-      "custom_domain": true
+      "pattern": "api.samuellopes.com.br/v2/*",
+      "zone_name": "samuellopes.com.br"
     }
   ],
   "observability": {
